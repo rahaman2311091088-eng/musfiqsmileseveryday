@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Batch CID Lookup — PubChem Console | Md Musfiqur Rahaman</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #0F1E2E;
+    --bg-raised: #142838;
+    --panel-line: #233a4c;
+    --text: #F2EFE6;
+    --text-dim: #8FA3B0;
+    --slate: #5A6B7A;
+    --accent: #7FE7C4;
+    --accent-dim: #4A9B82;
+    --amber: #E8A33D;
+    --error: #E8654A;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    background-image:
+      radial-gradient(circle at 15% 0%, rgba(127, 231, 196, 0.06), transparent 40%),
+      radial-gradient(circle at 85% 100%, rgba(232, 163, 61, 0.05), transparent 40%);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 20px 80px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
+
+  .scope { width: 100%; max-width: 760px; }
+
+  .eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent-dim);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .eyebrow::before {
+    content: '';
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 28px;
+    font-weight: 600;
+    margin: 0 0 10px;
+    letter-spacing: -0.01em;
+  }
+  h1 span { color: var(--text-dim); font-weight: 400; }
+
+  .sub {
+    color: var(--text-dim);
+    font-size: 15px;
+    line-height: 1.5;
+    margin: 0 0 32px;
+    max-width: 540px;
+  }
+
+  /* Console */
+  .console {
+    background: var(--bg-raised);
+    border: 1px solid var(--panel-line);
+    border-radius: 10px;
+    padding: 22px;
+  }
+
+  .console-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+  }
+
+  .console-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--slate);
+  }
+
+  .count-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .count-badge b { color: var(--amber); }
+  .count-badge.over b { color: var(--error); }
+
+  textarea#cidInput {
+    width: 100%;
+    min-height: 110px;
+    resize: vertical;
+    background: var(--bg);
+    border: 1px solid var(--panel-line);
+    border-radius: 6px;
+    color: var(--amber);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14.5px;
+    line-height: 1.7;
+    padding: 14px;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  textarea#cidInput:focus {
+    border-color: var(--accent-dim);
+    box-shadow: 0 0 0 3px rgba(127, 231, 196, 0.1);
+  }
+  textarea#cidInput::placeholder { color: var(--slate); font-family: 'Inter', sans-serif; font-size: 13.5px; }
+
+  .console-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+  }
+
+  button {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    border: none;
+    border-radius: 6px;
+    padding: 12px 20px;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease, opacity 0.15s ease;
+  }
+
+  button#fetchBtn { background: var(--accent); color: #0A1721; }
+  button#fetchBtn:hover { background: #9CF0D6; }
+  button#fetchBtn:active { transform: scale(0.97); }
+  button#fetchBtn:disabled { background: var(--panel-line); color: var(--slate); cursor: not-allowed; }
+
+  button#clearBtn {
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--panel-line);
+  }
+  button#clearBtn:hover { border-color: var(--slate); color: var(--text); }
+
+  .hint {
+    font-size: 12.5px;
+    color: var(--slate);
+    margin-top: 12px;
+  }
+  .hint button {
+    background: none; border: none; padding: 0;
+    color: var(--accent-dim);
+    font-size: 12.5px;
+    text-decoration: underline;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 400;
+  }
+  .hint button:hover { color: var(--accent); }
+
+  /* Progress */
+  .progress-wrap {
+    margin-top: 20px;
+    display: none;
+  }
+  .progress-wrap.active { display: block; }
+  .progress-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .progress-track {
+    height: 6px;
+    background: var(--panel-line);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.25s ease;
+  }
+
+  /* Results */
+  .results-wrap { margin-top: 28px; display: none; }
+  .results-wrap.active { display: block; }
+
+  .results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .results-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  .results-title b { color: var(--accent); }
+  .results-title .err-count { color: var(--error); }
+
+  button#downloadBtn {
+    background: var(--amber);
+    color: #1A1106;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  button#downloadBtn:hover { background: #F2B25C; }
+  button#downloadBtn:disabled { background: var(--panel-line); color: var(--slate); cursor: not-allowed; }
+  button#downloadBtn svg { width: 16px; height: 16px; }
+
+  .table-card {
+    background: var(--bg-raised);
+    border: 1px solid var(--panel-line);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+
+  thead th {
+    text-align: left;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--slate);
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--panel-line);
+    background: rgba(255,255,255,0.015);
+    white-space: nowrap;
+  }
+
+  tbody tr { border-bottom: 1px solid var(--panel-line); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: rgba(255,255,255,0.02); }
+  tbody tr.row-error { background: rgba(232, 101, 74, 0.05); }
+
+  td {
+    padding: 11px 14px;
+    vertical-align: top;
+  }
+
+  td.cid-cell {
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--amber);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  td.name-cell {
+    font-weight: 500;
+    max-width: 200px;
+  }
+
+  td.formula-cell {
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  td.smiles-cell {
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--accent);
+    font-size: 12.5px;
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  td.smiles-cell.is-error { color: var(--error); font-family: 'Inter', sans-serif; font-size: 13px; }
+
+  td.struct-cell { width: 56px; }
+  .mini-struct {
+    width: 44px; height: 44px;
+    background: #fff;
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .mini-struct img { width: 100%; height: 100%; object-fit: contain; }
+
+  /* States */
+  .state-box {
+    margin-top: 24px;
+    padding: 28px 22px;
+    text-align: center;
+    border-radius: 10px;
+    border: 1px solid var(--panel-line);
+    background: var(--bg-raised);
+    display: none;
+  }
+  .state-box.active { display: block; }
+  .state-box.error { border-color: rgba(232, 101, 74, 0.3); }
+  .state-text { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--text-dim); }
+  .state-box.error .state-text { color: var(--error); }
+
+  footer {
+    margin-top: 48px;
+    font-size: 12px;
+    color: var(--slate);
+    text-align: center;
+  }
+  footer a { color: var(--accent-dim); text-decoration: none; }
+  footer a:hover { color: var(--accent); }
+
+  button:focus-visible, textarea:focus-visible, a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  @media (max-width: 600px) {
+    td.smiles-cell, td.name-cell { max-width: 120px; }
+    .results-header { flex-direction: column; align-items: flex-start; }
+  }
+
+  /* Auth gate */
+  #authScreen {
+    width: 100%;
+    max-width: 380px;
+    margin: 0 auto;
+  }
+
+  .auth-card {
+    background: var(--bg-raised);
+    border: 1px solid var(--panel-line);
+    border-radius: 10px;
+    padding: 28px 26px;
+  }
+
+  .auth-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 22px;
+    background: var(--bg);
+    border-radius: 7px;
+    padding: 4px;
+  }
+
+  .auth-tab {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--slate);
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 13.5px;
+    padding: 9px 0;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .auth-tab.active { background: var(--accent); color: #0A1721; }
+  .auth-tab:not(.active):hover { color: var(--text-dim); }
+
+  .auth-field { margin-bottom: 14px; }
+  .auth-field label {
+    display: block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+  .auth-field input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--panel-line);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 14.5px;
+    padding: 11px 13px;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .auth-field input:focus {
+    border-color: var(--accent-dim);
+    box-shadow: 0 0 0 3px rgba(127, 231, 196, 0.1);
+  }
+
+  button#authSubmit {
+    width: 100%;
+    background: var(--accent);
+    color: #0A1721;
+    margin-top: 6px;
+  }
+  button#authSubmit:hover { background: #9CF0D6; }
+  button#authSubmit:disabled { background: var(--panel-line); color: var(--slate); cursor: not-allowed; }
+
+  .auth-msg {
+    margin-top: 14px;
+    font-size: 13px;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--text-dim);
+    text-align: center;
+    display: none;
+  }
+  .auth-msg.show { display: block; }
+  .auth-msg.error-msg { color: var(--error); }
+  .auth-msg.success-msg { color: var(--accent); }
+
+  .topbar {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 8px;
+  }
+  .topbar-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    color: var(--text-dim);
+  }
+  .topbar-user b { color: var(--accent); }
+  #signOutBtn {
+    background: transparent;
+    border: 1px solid var(--panel-line);
+    color: var(--text-dim);
+    font-size: 12.5px;
+    padding: 7px 14px;
+  }
+  #signOutBtn:hover { border-color: var(--slate); color: var(--text); }
+
+  #appScreen { display: none; width: 100%; }
+  #appScreen.active { display: flex; flex-direction: column; align-items: center; }
+</style>
+</head>
+<body>
+
+<div id="authScreen">
+  <div class="eyebrow" style="justify-content:center;">Sign in required</div>
+  <h1 style="text-align:center; font-size:22px;">Batch CID Lookup</h1>
+  <p class="sub" style="text-align:center; margin: 0 auto 28px;">Create a free account or sign in to use the portal.</p>
+
+  <div class="auth-card">
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-mode="signin">Sign in</button>
+      <button class="auth-tab" data-mode="signup">Create account</button>
+    </div>
+
+    <div class="auth-field">
+      <label for="authEmail">Email</label>
+      <input id="authEmail" type="email" autocomplete="email" placeholder="you@example.com">
+    </div>
+    <div class="auth-field">
+      <label for="authPassword">Password</label>
+      <input id="authPassword" type="password" autocomplete="current-password" placeholder="••••••••">
+    </div>
+    <div style="text-align:right; margin: -8px 0 14px;">
+      <button id="forgotPasswordBtn" type="button" style="background:none; border:none; padding:0; color: var(--accent-dim); font-size:12.5px; cursor:pointer; font-family:'Inter',sans-serif; font-weight:400; text-decoration:underline;">Forgot password?</button>
+    </div>
+
+    <button id="authSubmit">Sign in</button>
+    <div class="auth-msg" id="authMsg"></div>
+  </div>
+
+  <footer style="margin-top:32px;">Created by <strong style="color: var(--text-dim);">Md Musfiqur Rahaman</strong> &middot; Department of Pharmacy &middot; Daffodil International University</footer>
+</div>
+
+<div id="appScreen">
+<div class="scope">
+  <div class="topbar">
+    <div class="topbar-user">Signed in as <b id="userEmailLabel"></b><button id="signOutBtn">Sign out</button></div>
+  </div>
+  <div class="eyebrow">Live · PubChem PUG REST</div>
+  <h1>Batch CID Lookup <span>console</span></h1>
+  <p class="sub">Paste up to 50 PubChem Compound IDs — comma, space, or line separated — to pull CID, name, SMILES, molecular formula, and molecular weight for all of them at once, then download the set as a spreadsheet.</p>
+
+  <div class="console">
+    <div class="console-label-row">
+      <div class="console-label">Compound IDs (max 50)</div>
+      <div class="count-badge" id="countBadge"><b>0</b> / 50</div>
+    </div>
+    <textarea id="cidInput" placeholder="2244, 1983, 5793&#10;or one per line:&#10;2244&#10;1983&#10;5793"></textarea>
+    <div class="console-actions">
+      <button id="fetchBtn">Fetch all</button>
+      <button id="clearBtn">Clear</button>
+    </div>
+    <div class="hint">Try a sample set: <button id="sampleBtn">aspirin, caffeine, glucose, ibuprofen, paracetamol</button></div>
+  </div>
+
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-label"><span id="progressText">Fetching…</span><span id="progressCount">0 / 0</span></div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+  </div>
+
+  <div class="state-box" id="stateBox"><div class="state-text" id="stateText"></div></div>
+
+  <div class="results-wrap" id="resultsWrap">
+    <div class="results-header">
+      <div class="results-title" id="resultsTitle"></div>
+      <button id="downloadBtn" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        Download spreadsheet (.xlsx)
+      </button>
+    </div>
+    <div class="table-card">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>CID</th>
+            <th>Name</th>
+            <th>Formula</th>
+            <th>MW</th>
+            <th>SMILES</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>Data via <a href="https://pubchem.ncbi.nlm.nih.gov/" target="_blank" rel="noopener">PubChem</a>, National Library of Medicine</footer>
+  <footer style="margin-top: 10px;">Created by <strong style="color: var(--text-dim);">Md Musfiqur Rahaman</strong> &middot; Department of Pharmacy &middot; Daffodil International University</footer>
+</div>
+</div>
+
+<script>
+  const SUPABASE_URL = 'https://lfizlfdlrrmtkgzdmncc.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmaXpsZmRscnJtdGtnemRtbmNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyNDA3NTYsImV4cCI6MjA5NzgxNjc1Nn0.2oD5KlqRGber12j117F-VmJSHT66z-souEj5Q5CF_Ik';
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const authScreen = document.getElementById('authScreen');
+  const appScreen = document.getElementById('appScreen');
+  const authTabs = document.querySelectorAll('.auth-tab');
+  const authEmail = document.getElementById('authEmail');
+  const authPassword = document.getElementById('authPassword');
+  const authSubmit = document.getElementById('authSubmit');
+  const authMsg = document.getElementById('authMsg');
+  const userEmailLabel = document.getElementById('userEmailLabel');
+  const signOutBtn = document.getElementById('signOutBtn');
+
+  let authMode = 'signin';
+
+  authTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      authTabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      authMode = tab.dataset.mode;
+      authSubmit.textContent = authMode === 'signin' ? 'Sign in' : 'Create account';
+      authMsg.classList.remove('show', 'error-msg', 'success-msg');
+    });
+  });
+
+  function showAuthMsg(text, isError) {
+    authMsg.textContent = text;
+    authMsg.classList.add('show');
+    authMsg.classList.toggle('error-msg', !!isError);
+    authMsg.classList.toggle('success-msg', !isError);
+  }
+
+  authSubmit.addEventListener('click', async () => {
+    const email = authEmail.value.trim();
+    const password = authPassword.value;
+    if (!email || !password) {
+      showAuthMsg('Enter both email and password.', true);
+      return;
+    }
+    authSubmit.disabled = true;
+    authMsg.classList.remove('show');
+
+    try {
+      if (authMode === 'signup') {
+        const { error } = await supabaseClient.auth.signUp({ email, password });
+        if (error) throw error;
+        showAuthMsg('Account created. Check your email to confirm, then sign in.', false);
+      } else {
+        const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      }
+    } catch (err) {
+      showAuthMsg(err.message || 'Something went wrong. Try again.', true);
+    } finally {
+      authSubmit.disabled = false;
+    }
+  });
+
+  signOutBtn.addEventListener('click', async () => {
+    await supabaseClient.auth.signOut();
+  });
+
+  const forgotPasswordBtn = document.getElementById('forgotPasswordBtn');
+  forgotPasswordBtn.addEventListener('click', async () => {
+    const email = authEmail.value.trim();
+    if (!email) {
+      showAuthMsg('Enter your email above first, then click "Forgot password?"', true);
+      return;
+    }
+    forgotPasswordBtn.disabled = true;
+    try {
+      const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.href
+      });
+      if (error) throw error;
+      showAuthMsg('Password reset link sent. Check your email.', false);
+    } catch (err) {
+      showAuthMsg(err.message || 'Could not send reset email.', true);
+    } finally {
+      forgotPasswordBtn.disabled = false;
+    }
+  });
+
+  async function handlePasswordRecovery() {
+    const newPassword = prompt('Enter a new password (minimum 6 characters):');
+    if (!newPassword) return;
+    const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+    if (error) {
+      alert('Could not update password: ' + error.message);
+    } else {
+      alert('Password updated. You are now signed in.');
+    }
+  }
+
+  function showApp(user) {
+    authScreen.style.display = 'none';
+    appScreen.classList.add('active');
+    userEmailLabel.textContent = user.email;
+  }
+
+  function showAuth() {
+    appScreen.classList.remove('active');
+    authScreen.style.display = 'block';
+  }
+
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY') {
+      handlePasswordRecovery();
+      return;
+    }
+    if (session && session.user) {
+      showApp(session.user);
+    } else {
+      showAuth();
+    }
+  });
+
+  supabaseClient.auth.getSession().then(({ data }) => {
+    if (data.session && data.session.user) {
+      showApp(data.session.user);
+    } else {
+      showAuth();
+    }
+  });
+</script>
+
+<script>
+  const MAX_CIDS = 50;
+
+  const cidInput = document.getElementById('cidInput');
+  const countBadge = document.getElementById('countBadge');
+  const fetchBtn = document.getElementById('fetchBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const sampleBtn = document.getElementById('sampleBtn');
+  const progressWrap = document.getElementById('progressWrap');
+  const progressText = document.getElementById('progressText');
+  const progressCount = document.getElementById('progressCount');
+  const progressFill = document.getElementById('progressFill');
+  const stateBox = document.getElementById('stateBox');
+  const stateText = document.getElementById('stateText');
+  const resultsWrap = document.getElementById('resultsWrap');
+  const resultsTitle = document.getElementById('resultsTitle');
+  const resultsBody = document.getElementById('resultsBody');
+  const downloadBtn = document.getElementById('downloadBtn');
+
+  let lastResults = [];
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function parseCids(raw) {
+    return raw
+      .split(/[\s,]+/)
+      .map(s => s.trim())
+      .filter(Boolean);
+  }
+
+  function updateCount() {
+    const cids = parseCids(cidInput.value);
+    const n = cids.length;
+    countBadge.innerHTML = `<b>${n}</b> / ${MAX_CIDS}`;
+    countBadge.classList.toggle('over', n > MAX_CIDS);
+  }
+
+  cidInput.addEventListener('input', updateCount);
+
+  clearBtn.addEventListener('click', () => {
+    cidInput.value = '';
+    updateCount();
+    resultsWrap.classList.remove('active');
+    stateBox.classList.remove('active');
+    progressWrap.classList.remove('active');
+  });
+
+  sampleBtn.addEventListener('click', () => {
+    cidInput.value = '2244, 2519, 5793, 3672, 1983';
+    updateCount();
+    runBatch();
+  });
+
+  function showState(msg, isError) {
+    stateText.textContent = msg;
+    stateBox.classList.add('active');
+    stateBox.classList.toggle('error', !!isError);
+  }
+  function hideState() { stateBox.classList.remove('active'); }
+
+  async function runBatch() {
+    const cids = [...new Set(parseCids(cidInput.value))];
+
+    if (cids.length === 0) {
+      showState('Add at least one PubChem CID — for example, 2244.', true);
+      return;
+    }
+    if (cids.length > MAX_CIDS) {
+      showState(`You've entered ${cids.length} CIDs. Trim the list to ${MAX_CIDS} or fewer and try again.`, true);
+      return;
+    }
+    if (!cids.every(c => /^\d+$/.test(c))) {
+      showState('Every entry must be a numeric CID, like 2244. Remove any non-numeric values.', true);
+      return;
+    }
+
+    hideState();
+    resultsWrap.classList.remove('active');
+    fetchBtn.disabled = true;
+    downloadBtn.disabled = true;
+    progressWrap.classList.add('active');
+    progressText.textContent = 'Fetching properties…';
+    progressCount.textContent = `0 / ${cids.length}`;
+    progressFill.style.width = '5%';
+
+    let results = [];
+
+    try {
+      const propUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cids.join(',')}/property/IUPACName,SMILES,ConnectivitySMILES,MolecularFormula,MolecularWeight/JSON`;
+      const propRes = await fetch(propUrl);
+
+      let propsByCid = {};
+      if (propRes.ok) {
+        const data = await propRes.json();
+        const list = data?.PropertyTable?.Properties || [];
+        list.forEach(p => { propsByCid[String(p.CID)] = p; });
+      }
+
+      progressFill.style.width = '40%';
+      progressText.textContent = 'Resolving common names…';
+
+      let done = 0;
+      for (const cid of cids) {
+        const props = propsByCid[cid];
+        let row;
+        if (!props) {
+          row = { cid, name: '', formula: '', smiles: '', error: 'No record found for this CID' };
+        } else {
+          const smiles = props.SMILES || props.ConnectivitySMILES || props.CanonicalSMILES || '';
+          let name = props.IUPACName || '';
+          row = { cid, name, formula: props.MolecularFormula || '', weight: props.MolecularWeight || '', smiles, error: smiles ? null : 'SMILES not available' };
+        }
+        results.push(row);
+        done++;
+        progressCount.textContent = `${done} / ${cids.length}`;
+        progressFill.style.width = `${40 + (done / cids.length) * 40}%`;
+      }
+
+      // Best-effort: fetch friendlier common names in parallel, don't block on failures
+      progressText.textContent = 'Polishing names…';
+      await Promise.all(results.map(async (row) => {
+        if (row.error) return;
+        try {
+          const synRes = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${row.cid}/synonyms/JSON`);
+          if (synRes.ok) {
+            const synData = await synRes.json();
+            const syns = synData?.InformationList?.Information?.[0]?.Synonym;
+            if (syns && syns.length > 0) row.name = syns[0];
+          }
+        } catch (e) { /* keep IUPAC name fallback */ }
+        if (!row.name) row.name = `CID ${row.cid}`;
+      }));
+
+      progressFill.style.width = '100%';
+
+    } catch (err) {
+      progressWrap.classList.remove('active');
+      fetchBtn.disabled = false;
+      showState('Could not reach PubChem. Check your connection and try again.', true);
+      return;
+    }
+
+    setTimeout(() => {
+      progressWrap.classList.remove('active');
+      fetchBtn.disabled = false;
+      renderResults(results);
+    }, 200);
+  }
+
+  function renderResults(results) {
+    lastResults = results;
+    const errCount = results.filter(r => r.error).length;
+    const okCount = results.length - errCount;
+
+    resultsTitle.innerHTML = errCount > 0
+      ? `<b>${okCount}</b> resolved &middot; <span class="err-count">${errCount} failed</span> of ${results.length}`
+      : `<b>${okCount}</b> of ${results.length} resolved`;
+
+    resultsBody.innerHTML = results.map(r => {
+      if (r.error) {
+        return `
+          <tr class="row-error">
+            <td class="struct-cell"><div class="mini-struct"><span style="font-size:9px;color:#ccc;font-family:'IBM Plex Mono',monospace;">N/A</span></div></td>
+            <td class="cid-cell">${escapeHtml(r.cid)}</td>
+            <td class="name-cell" colspan="4"><span class="smiles-cell is-error">${escapeHtml(r.error)}</span></td>
+          </tr>`;
+      }
+      const imgUrl = `https://pubchem.ncbi.nlm.nih.gov/image/imgsrv.fcgi?cid=${r.cid}&t=l`;
+      return `
+        <tr>
+          <td class="struct-cell">
+            <div class="mini-struct">
+              <img src="${imgUrl}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='';">
+            </div>
+          </td>
+          <td class="cid-cell">${escapeHtml(r.cid)}</td>
+          <td class="name-cell" title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</td>
+          <td class="formula-cell">${escapeHtml(r.formula)}</td>
+          <td class="formula-cell">${escapeHtml(r.weight)}</td>
+          <td class="smiles-cell" title="${escapeHtml(r.smiles)}">${escapeHtml(r.smiles)}</td>
+        </tr>`;
+    }).join('');
+
+    resultsWrap.classList.add('active');
+    downloadBtn.disabled = results.every(r => r.error);
+  }
+
+  downloadBtn.addEventListener('click', () => {
+    if (!lastResults.length) return;
+    const rows = lastResults
+      .filter(r => !r.error)
+      .map(r => ({
+        'PubChem CID': r.cid,
+        'Name': r.name,
+        'SMILES': r.smiles,
+        'Molecular Formula': r.formula,
+        'Molecular Weight': r.weight
+      }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{ wch: 12 }, { wch: 30 }, { wch: 50 }, { wch: 16 }, { wch: 16 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'PubChem Lookup');
+    const stamp = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `pubchem-lookup-${stamp}.xlsx`);
+  });
+
+  fetchBtn.addEventListener('click', runBatch);
+  cidInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) runBatch();
+  });
+
+  updateCount();
+</script>
+
+</body>
+</html>
