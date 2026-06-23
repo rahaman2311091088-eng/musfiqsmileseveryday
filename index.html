@@ -478,18 +478,28 @@
     <div class="auth-tabs">
       <button class="auth-tab active" data-mode="signin">Sign in</button>
       <button class="auth-tab" data-mode="signup">Create account</button>
+      <button class="auth-tab" data-mode="guest">Guest code</button>
     </div>
 
-    <div class="auth-field">
-      <label for="authEmail">Email</label>
-      <input id="authEmail" type="email" autocomplete="email" placeholder="you@example.com">
+    <div id="emailAuthFields">
+      <div class="auth-field">
+        <label for="authEmail">Email</label>
+        <input id="authEmail" type="email" autocomplete="email" placeholder="you@example.com">
+      </div>
+      <div class="auth-field">
+        <label for="authPassword">Password</label>
+        <input id="authPassword" type="password" autocomplete="current-password" placeholder="••••••••">
+      </div>
+      <div style="text-align:right; margin: -8px 0 14px;">
+        <button id="forgotPasswordBtn" type="button" style="background:none; border:none; padding:0; color: var(--accent-dim); font-size:12.5px; cursor:pointer; font-family:'Inter',sans-serif; font-weight:400; text-decoration:underline;">Forgot password?</button>
+      </div>
     </div>
-    <div class="auth-field">
-      <label for="authPassword">Password</label>
-      <input id="authPassword" type="password" autocomplete="current-password" placeholder="••••••••">
-    </div>
-    <div style="text-align:right; margin: -8px 0 14px;">
-      <button id="forgotPasswordBtn" type="button" style="background:none; border:none; padding:0; color: var(--accent-dim); font-size:12.5px; cursor:pointer; font-family:'Inter',sans-serif; font-weight:400; text-decoration:underline;">Forgot password?</button>
+
+    <div id="guestAuthFields" style="display:none;">
+      <div class="auth-field">
+        <label for="guestCode">Access code</label>
+        <input id="guestCode" type="text" autocomplete="off" placeholder="Enter the access code" style="font-family:'IBM Plex Mono', monospace;">
+      </div>
     </div>
 
     <button id="authSubmit">Sign in</button>
@@ -572,6 +582,15 @@
   const authMsg = document.getElementById('authMsg');
   const userEmailLabel = document.getElementById('userEmailLabel');
   const signOutBtn = document.getElementById('signOutBtn');
+  const emailAuthFields = document.getElementById('emailAuthFields');
+  const guestAuthFields = document.getElementById('guestAuthFields');
+  const guestCode = document.getElementById('guestCode');
+
+  // Guest access: anyone entering this code signs in as a single shared guest account.
+  // The guest account itself still needs a real email+password created once in Supabase.
+  const GUEST_ACCESS_CODE = 'azadbioacademy';
+  const GUEST_EMAIL = 'guest@azadbioacademy.local';
+  const GUEST_PASSWORD = 'azadbioacademy-guest-2026';
 
   let authMode = 'signin';
 
@@ -580,8 +599,17 @@
       authTabs.forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
       authMode = tab.dataset.mode;
-      authSubmit.textContent = authMode === 'signin' ? 'Sign in' : 'Create account';
       authMsg.classList.remove('show', 'error-msg', 'success-msg');
+
+      if (authMode === 'guest') {
+        emailAuthFields.style.display = 'none';
+        guestAuthFields.style.display = 'block';
+        authSubmit.textContent = 'Continue as guest';
+      } else {
+        emailAuthFields.style.display = 'block';
+        guestAuthFields.style.display = 'none';
+        authSubmit.textContent = authMode === 'signin' ? 'Sign in' : 'Create account';
+      }
     });
   });
 
@@ -593,6 +621,33 @@
   }
 
   authSubmit.addEventListener('click', async () => {
+    authMsg.classList.remove('show');
+
+    if (authMode === 'guest') {
+      const code = guestCode.value.trim();
+      if (!code) {
+        showAuthMsg('Enter the access code.', true);
+        return;
+      }
+      if (code !== GUEST_ACCESS_CODE) {
+        showAuthMsg('That code is not valid.', true);
+        return;
+      }
+      authSubmit.disabled = true;
+      try {
+        const { error } = await supabaseClient.auth.signInWithPassword({
+          email: GUEST_EMAIL,
+          password: GUEST_PASSWORD
+        });
+        if (error) throw error;
+      } catch (err) {
+        showAuthMsg('Guest access is not set up yet. Contact the admin.', true);
+      } finally {
+        authSubmit.disabled = false;
+      }
+      return;
+    }
+
     const email = authEmail.value.trim();
     const password = authPassword.value;
     if (!email || !password) {
@@ -600,7 +655,6 @@
       return;
     }
     authSubmit.disabled = true;
-    authMsg.classList.remove('show');
 
     try {
       if (authMode === 'signup') {
@@ -657,7 +711,7 @@
   function showApp(user) {
     authScreen.style.display = 'none';
     appScreen.classList.add('active');
-    userEmailLabel.textContent = user.email;
+    userEmailLabel.textContent = (user.email === GUEST_EMAIL) ? 'Guest' : user.email;
   }
 
   function showAuth() {
