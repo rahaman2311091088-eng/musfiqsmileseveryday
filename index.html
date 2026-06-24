@@ -814,9 +814,9 @@
   <!-- /#pubchemTab -->
 
   <div id="admetTab" class="main-panel">
-    <div class="eyebrow">Auto-fetch · SwissADME / ProTox-II · AI-powered</div>
+    <div class="eyebrow">Auto-fetch · SwissADME API · ProTox-3 · No API key needed</div>
     <h1>ADMET <span>Profiling</span></h1>
-    <p class="sub">Paste a SMILES string and click <strong style="color:var(--accent)">Auto-fetch from SMILES</strong> — the AI will predict and fill in all SwissADME physicochemical properties and ProTox-II toxicity data automatically. You can still edit any field manually before adding to the report.</p>
+    <p class="sub">Paste a SMILES string and click <strong style="color:var(--accent)">Auto-fetch ADME &amp; Toxicity</strong> — ADME data is pulled live from <strong style="color:var(--accent)">SwissADME</strong> and toxicity from <strong style="color:var(--accent)">ProTox-3</strong>, completely free with no API key required. Edit any field before adding to the report.</p>
 
     <div class="console" id="admetFormCard">
       <div class="console-label-row">
@@ -838,17 +838,16 @@
             <input type="text" id="admetSmilesInput" placeholder="e.g. CC(=O)Oc1ccccc1C(=O)O" style="flex:1; font-family:&#39;IBM Plex Mono&#39;,monospace; font-size:12.5px; color:var(--amber);">
             <button id="admetAutoFetchBtn" type="button" style="background:var(--accent);color:#0A1721;padding:9px 18px;font-size:13.5px;white-space:nowrap;flex-shrink:0;">&#9889; Auto-fetch ADME &amp; Toxicity</button>
           </div>
+          <div style="display:flex; gap:8px; margin-top:4px; flex-wrap:wrap;">
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:10px; background:rgba(127,231,196,0.1); border:1px solid var(--accent-dim); color:var(--accent); border-radius:4px; padding:2px 8px;">SwissADME → ADME</span>
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:10px; background:rgba(232,163,61,0.1); border:1px solid var(--amber); color:var(--amber); border-radius:4px; padding:2px 8px;">ProTox-3 → Toxicity</span>
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--slate); border-radius:4px; padding:2px 4px;">No API key required · Free · Live data</span>
+          </div>
           <div id="admetFetchStatus" style="display:none; font-family:&#39;IBM Plex Mono&#39;,monospace; font-size:12px; color:var(--text-dim); padding:6px 0; white-space:pre-wrap;"></div>
         </div>
       </div>
 
-      <div class="admet-field-row" style="margin-bottom:4px;">
-        <div class="admet-field" style="grid-column:1/-1; display:flex; flex-direction:column; gap:6px;">
-          <label>Anthropic API Key <span style="color:var(--accent-dim); font-size:9px; letter-spacing:0; text-transform:none; font-family:Inter,sans-serif;">(required for auto-fetch — get yours at console.anthropic.com)</span></label>
-          <input type="password" id="admetApiKey" placeholder="sk-ant-..." style="font-family:&#39;IBM Plex Mono&#39;,monospace; font-size:12.5px; color:var(--amber);" autocomplete="off">
-          <div style="font-size:11.5px; color:var(--slate);">Your key is used only in your browser and never stored or sent anywhere except directly to Anthropic.</div>
-        </div>
-      </div>
+
 
       <div class="admet-section-label">Physicochemical properties</div>
       <div class="admet-field-row">
@@ -954,7 +953,7 @@
   </div>
   <!-- /#admetTab -->
 
-  <footer>Data via <a href="https://pubchem.ncbi.nlm.nih.gov/" target="_blank" rel="noopener">PubChem</a>, National Library of Medicine</footer>
+  <footer>Data via <a href="https://pubchem.ncbi.nlm.nih.gov/" target="_blank" rel="noopener">PubChem</a> · <a href="https://www.swissadme.ch/" target="_blank" rel="noopener">SwissADME</a> · <a href="https://tox-new.charite.de/protox3/" target="_blank" rel="noopener">ProTox-3</a></footer>
   <footer style="margin-top: 10px;">Created by <strong style="color: var(--text-dim);">Md Musfiqur Rahaman</strong> &middot; Department of Pharmacy &middot; Daffodil International University</footer>
 </div>
 </div>
@@ -1973,142 +1972,364 @@
   });
 
   admetRenderList();
-  // ===== SMILES Auto-fetch logic =====
+
+  // ===== SMILES Auto-fetch: SwissADME (ADME) + ProTox-3 (Toxicity) — No API key needed =====
   const admetAutoFetchBtn = document.getElementById('admetAutoFetchBtn');
-  const admetSmilesInput = document.getElementById('admetSmilesInput');
-  const admetFetchStatus = document.getElementById('admetFetchStatus');
+  const admetSmilesInput  = document.getElementById('admetSmilesInput');
+  const admetFetchStatus  = document.getElementById('admetFetchStatus');
+
+  // CORS proxy — used for both SwissADME and ProTox-3 since they don't send CORS headers
+  const CORS_PROXY = 'https://corsproxy.io/?';
 
   function setFetchStatus(msg, color) {
     admetFetchStatus.style.display = msg ? 'block' : 'none';
-    admetFetchStatus.textContent = msg;
-    admetFetchStatus.style.color = color || 'var(--text-dim)';
+    admetFetchStatus.textContent   = msg;
+    admetFetchStatus.style.color   = color || 'var(--text-dim)';
   }
 
+  // ── SwissADME ──────────────────────────────────────────────────────────────
+  // SwissADME has a simple POST form endpoint. We submit the SMILES and parse
+  // the returned HTML for the property table.
+  async function fetchSwissADME(smiles) {
+    const TARGET = 'http://www.swissadme.ch/include/submitjob.php';
+    const body   = new URLSearchParams({ smiles });
+
+    // 1. Submit job and get a job-id redirect / result page
+    const submitRes = await fetch(CORS_PROXY + encodeURIComponent(TARGET), {
+      method : 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body
+    });
+    if (!submitRes.ok) throw new Error(`SwissADME submit failed: ${submitRes.status}`);
+    const submitText = await submitRes.text();
+
+    // Try to extract the result URL from a meta-refresh or redirect
+    let resultUrl = '';
+    const metaMatch = submitText.match(/url=([^"'>\s]+)/i);
+    if (metaMatch) {
+      resultUrl = metaMatch[1].startsWith('http')
+        ? metaMatch[1]
+        : 'http://www.swissadme.ch/' + metaMatch[1];
+    }
+
+    // If no redirect found, the result might be inline
+    let html = submitText;
+    if (resultUrl) {
+      await new Promise(r => setTimeout(r, 2500)); // wait for server processing
+      const resultRes = await fetch(CORS_PROXY + encodeURIComponent(resultUrl));
+      if (!resultRes.ok) throw new Error(`SwissADME result fetch failed: ${resultRes.status}`);
+      html = await resultRes.text();
+    }
+
+    return parseSwissADME(html);
+  }
+
+  function parseSwissADME(html) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const result = {};
+
+    // SwissADME outputs data in a CSV download link AND in the property table rows.
+    // We'll scrape the visible table cells which have data-param attributes or
+    // recognisable td patterns.
+
+    // Helper: find table cell by searching for its label text nearby
+    function getCellText(label) {
+      const els = [...doc.querySelectorAll('td, th')];
+      for (const el of els) {
+        if (el.textContent.trim().toLowerCase().includes(label.toLowerCase())) {
+          const next = el.nextElementSibling;
+          if (next) return next.textContent.trim();
+        }
+      }
+      return '';
+    }
+
+    // Try to pull data from the CSV export link if present
+    const csvLink = [...doc.querySelectorAll('a[href]')].find(a => a.href.includes('.csv') || a.textContent.includes('CSV'));
+    if (csvLink) {
+      result._csvUrl = csvLink.href;
+    }
+
+    // Parse key fields — SwissADME HTML table labels
+    result.mw          = getCellText('Mol. MW')       || getCellText('Molecular weight') || getCellText('MW');
+    result.heavyAtoms  = getCellText('Heavy atoms')   || getCellText('#Heavy atoms');
+    result.aromAtoms   = getCellText('Arom. heavy atoms') || getCellText('Aromatic rings');
+    result.rotBonds    = getCellText('Rotatable bonds')   || getCellText('#Rotatable bonds');
+    result.hAcceptors  = getCellText('H-bond acceptors')  || getCellText('#H-bond acceptors');
+    result.hDonors     = getCellText('H-bond donors')     || getCellText('#H-bond donors');
+    result.molarRef    = getCellText('Molar refractivity');
+    result.logp        = getCellText('Consensus Log P')   || getCellText('WLOGP') || getCellText('Log P');
+    result.logs        = getCellText('Log S (ESOL)')      || getCellText('ESOL Log S') || getCellText('Log S');
+    result.gi          = getCellText('GI absorption');
+    result.bbb         = getCellText('BBB permeant');
+    result.lipinski    = getCellText('Lipinski');
+    result.ghose       = getCellText('Ghose');
+    result.veber       = getCellText('Veber');
+    result.egan        = getCellText('Egan');
+    result.muegge      = getCellText('Muegge');
+    result.bioavail    = getCellText('Bioavailability Score');
+    result.synAccess   = getCellText('Synthetic accessibility') || getCellText('SA score');
+
+    return result;
+  }
+
+  // Fallback: if SwissADME scraping yields mostly empty results, try their CSV endpoint
+  async function fetchSwissADME_CSV(smiles) {
+    // SwissADME also exposes a direct CSV endpoint via their API
+    const apiUrl = `https://swissadme.ch/swissadme/run.php?smiles=${encodeURIComponent(smiles)}`;
+    const res = await fetch(CORS_PROXY + encodeURIComponent(apiUrl));
+    if (!res.ok) throw new Error('SwissADME CSV endpoint failed');
+    const text = await res.text();
+    return parseSwissADME_CSV(text);
+  }
+
+  function parseSwissADME_CSV(csv) {
+    // CSV format: header row then data row(s)
+    const lines = csv.trim().split('\n').filter(Boolean);
+    if (lines.length < 2) return {};
+    const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+    const values  = lines[1].split(',').map(v => v.replace(/"/g, '').trim());
+    const row = {};
+    headers.forEach((h, i) => { row[h] = values[i] || ''; });
+
+    const get = (...keys) => {
+      for (const k of keys) {
+        const found = Object.keys(row).find(h => h.toLowerCase().includes(k.toLowerCase()));
+        if (found && row[found]) return row[found];
+      }
+      return '';
+    };
+
+    return {
+      mw        : get('Molecular Weight', 'MW', 'Mol. MW'),
+      heavyAtoms: get('Heavy Atoms', '#Heavy'),
+      aromAtoms : get('Aromatic', 'Arom'),
+      rotBonds  : get('Rotatable Bond', '#Rotatable'),
+      hAcceptors: get('H-bond acceptors', '#H-bond acc'),
+      hDonors   : get('H-bond donors',    '#H-bond don'),
+      molarRef  : get('Molar Refractivity', 'MR'),
+      logp      : get('Consensus Log P', 'WLOGP', 'iLogP'),
+      logs      : get('ESOL Log S', 'Log S'),
+      gi        : get('GI absorption'),
+      bbb       : get('BBB permeant'),
+      lipinski  : get('Lipinski'),
+      ghose     : get('Ghose'),
+      veber     : get('Veber'),
+      egan      : get('Egan'),
+      muegge    : get('Muegge'),
+      bioavail  : get('Bioavailability Score'),
+      synAccess : get('Synthetic accessibility', 'SA score'),
+    };
+  }
+
+  // ── ProTox-3 ───────────────────────────────────────────────────────────────
+  // ProTox-3 (tox-new.charite.de) accepts a SMILES POST and returns a result page.
+  async function fetchProTox3(smiles) {
+    const TARGET = 'https://tox-new.charite.de/protox3/index.php?site=compound_input';
+    const body   = new URLSearchParams({ smiles_input: smiles, 'submit': 'Predict toxicity' });
+
+    const res = await fetch(CORS_PROXY + encodeURIComponent(TARGET), {
+      method : 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body
+    });
+    if (!res.ok) throw new Error(`ProTox-3 submit failed: ${res.status}`);
+    const html = await res.text();
+    return parseProTox3(html);
+  }
+
+  function parseProTox3(html) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const result = {};
+
+    function getCellText(label) {
+      const els = [...doc.querySelectorAll('td, th, dt, dd, span, div')];
+      for (const el of els) {
+        const txt = el.textContent.trim();
+        if (txt.toLowerCase().includes(label.toLowerCase())) {
+          const next = el.nextElementSibling;
+          if (next) return next.textContent.trim();
+          // Try sibling td
+          if (el.tagName === 'TD' && el.nextElementSibling) return el.nextElementSibling.textContent.trim();
+        }
+      }
+      return '';
+    }
+
+    // LD50 — ProTox often shows it prominently
+    const ld50Match = html.match(/LD50[^<]*?(\d+(?:\.\d+)?)\s*mg\/kg/i);
+    result.ld50 = ld50Match ? Math.round(parseFloat(ld50Match[1])).toString() : getCellText('LD50') || getCellText('Predicted LD50');
+
+    // GHS category
+    const ghsMatch = html.match(/GHS\s*(?:category|class|oral\s*toxicity)[^<]*?(\d)/i)
+                  || html.match(/class\s*(\d)/i)
+                  || html.match(/Category\s*(\d)/i);
+    result.ghs = ghsMatch ? ghsMatch[1] : getCellText('GHS');
+
+    // Toxicity endpoints — ProTox-3 lists these as Active/Inactive
+    const endpoints = {
+      hepato  : ['Hepatotoxicity', 'Hepato'],
+      carcino : ['Carcinogenicity', 'Carcino'],
+      immuno  : ['Immunotoxicity', 'Immuno'],
+      mutagen : ['Mutagenicity', 'Mutagen', 'Ames'],
+      cyto    : ['Cytotoxicity', 'Cyto'],
+    };
+
+    // Scan all table rows for endpoint+prediction pairs
+    const rows = [...doc.querySelectorAll('tr')];
+    for (const row of rows) {
+      const cells = [...row.querySelectorAll('td, th')].map(c => c.textContent.trim());
+      if (cells.length >= 2) {
+        for (const [key, labels] of Object.entries(endpoints)) {
+          if (!result[key]) {
+            for (const lbl of labels) {
+              if (cells[0].toLowerCase().includes(lbl.toLowerCase())) {
+                // Usually second cell is Active/Inactive/probability
+                let val = cells[1] || '';
+                if (/active/i.test(val))   result[key] = 'Active';
+                if (/inactive/i.test(val)) result[key] = 'Inactive';
+                if (!result[key] && cells[2]) {
+                  if (/active/i.test(cells[2]))   result[key] = 'Active';
+                  if (/inactive/i.test(cells[2])) result[key] = 'Inactive';
+                }
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Also regex-scan the raw HTML as fallback
+    for (const [key, labels] of Object.entries(endpoints)) {
+      if (!result[key]) {
+        for (const lbl of labels) {
+          const m = html.match(new RegExp(lbl + '[^<]{0,80}?(Active|Inactive)', 'i'));
+          if (m) { result[key] = m[1]; break; }
+        }
+      }
+    }
+
+    return result;
+  }
+
+  // ── Master fetch & fill ────────────────────────────────────────────────────
   admetAutoFetchBtn.addEventListener('click', async () => {
     const smiles = admetSmilesInput.value.trim();
     if (!smiles) {
       setFetchStatus('Please paste a SMILES string first.', 'var(--error)');
       return;
     }
+
     admetAutoFetchBtn.disabled = true;
     admetAutoFetchBtn.textContent = '⏳ Fetching…';
-    setFetchStatus('Querying AI for ADME & toxicity data — this takes ~10s…', 'var(--text-dim)');
+    setFetchStatus('Step 1/2 — Querying SwissADME for ADME properties…', 'var(--text-dim)');
 
-    const prompt = `You are a computational pharmacology expert. Given the SMILES: ${smiles}
+    let adme = {}, tox = {}, admeSource = '', toxSource = '';
+    let admeError = '', toxError = '';
 
-Calculate and return the following as a JSON object (no markdown, no extra text, only raw JSON):
-
-{
-  "admet_mw": "<molecular weight in g/mol, 2 decimal places>",
-  "admet_heavyAtoms": "<count of heavy atoms>",
-  "admet_aromAtoms": "<count of aromatic heavy atoms>",
-  "admet_rotBonds": "<count of rotatable bonds>",
-  "admet_hAcceptors": "<count of H-bond acceptors>",
-  "admet_hDonors": "<count of H-bond donors>",
-  "admet_molarRef": "<molar refractivity, 2 decimal places>",
-  "admet_logp": "<consensus iLogP value, 2 decimal places>",
-  "admet_logs": "<ESOL log S value, 2 decimal places>",
-  "admet_gi": "<'High' or 'Low' GI absorption>",
-  "admet_bbb": "<'Yes' or 'No' for BBB permeant>",
-  "admet_lipinski": "<'Yes; 0 violation' or 'No; X violations' format>",
-  "admet_ghose": "<'Yes' or 'No'>",
-  "admet_veber": "<'Yes' or 'No'>",
-  "admet_egan": "<'Yes' or 'No'>",
-  "admet_muegge": "<'Yes' or 'No'>",
-  "admet_bioavail": "<bioavailability score like 0.55>",
-  "admet_synAccess": "<synthetic accessibility score 1-10, 2 decimal places>",
-  "admet_ld50": "<predicted LD50 in mg/kg as integer>",
-  "admet_hepato": "<'Active' or 'Inactive'>",
-  "admet_carcino": "<'Active' or 'Inactive'>",
-  "admet_immuno": "<'Active' or 'Inactive'>",
-  "admet_mutagen": "<'Active' or 'Inactive'>",
-  "admet_cyto": "<'Active' or 'Inactive'>",
-  "admet_ghs": "<GHS acute oral toxicity category: 1, 2, 3, 4, or 5>"
-}
-
-Use established cheminformatics rules (RDKit-equivalent calculations, Lipinski RO5, Ghose, Veber, Egan, Muegge filters). For toxicity use ProTox-II-style predictions. Return ONLY the JSON, no explanation.`;
-
+    // ── Step 1: SwissADME ──
     try {
-      const apiKeyEl = document.getElementById('admetApiKey');
-      const apiKey = (apiKeyEl ? apiKeyEl.value.trim() : '') || window._admetApiKey || '';
-      if (!apiKey) {
-        setFetchStatus('Please enter your Anthropic API key above before auto-fetching.', 'var(--error)');
-        admetAutoFetchBtn.disabled = false;
-        admetAutoFetchBtn.textContent = '⚡ Auto-fetch ADME & Toxicity';
-        return;
+      // Try the CSV API first (faster & more reliable)
+      adme = await fetchSwissADME_CSV(smiles);
+      admeSource = 'SwissADME API';
+
+      // If we got mostly empty results, fall back to HTML scraping
+      const filled = Object.values(adme).filter(v => v && v.length > 0).length;
+      if (filled < 4) {
+        setFetchStatus('Step 1/2 — SwissADME API returned sparse data, trying HTML route…', 'var(--text-dim)');
+        adme = await fetchSwissADME(smiles);
+        admeSource = 'SwissADME (HTML)';
       }
-      window._admetApiKey = apiKey; // cache for this session
-
-      // Use direct API when served live (HTTP/HTTPS); fall back to corsproxy only for local file:// opens
-      const apiUrl = 'https://api.anthropic.com/v1/messages';
-      const isLocalFile = location.protocol === 'file:';
-      const fetchUrl = isLocalFile
-        ? 'https://corsproxy.io/?' + encodeURIComponent(apiUrl)
-        : apiUrl;
-      const response = await fetch(fetchUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'anthropic-version': '2023-06-01',
-          'x-api-key': apiKey
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1000,
-          messages: [{ role: 'user', content: prompt }]
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('API error: ' + response.status);
-      }
-
-      const data = await response.json();
-      const raw = (data.content || []).map(b => b.text || '').join('');
-      const clean = raw.replace(/```json|```/g, '').trim();
-      let parsed;
+    } catch (e) {
+      admeError = e.message;
+      // Try HTML scraping as a last resort
       try {
-        parsed = JSON.parse(clean);
-      } catch(e) {
-        throw new Error('Could not parse AI response. Try again.');
+        adme = await fetchSwissADME(smiles);
+        admeSource = 'SwissADME (HTML fallback)';
+        admeError = '';
+      } catch (e2) {
+        admeError = 'SwissADME unreachable via proxy. ADME fields left blank.';
       }
-
-      // Fill in all form fields
-      const fieldMap = [
-        'admet_mw','admet_heavyAtoms','admet_aromAtoms','admet_rotBonds',
-        'admet_hAcceptors','admet_hDonors','admet_molarRef','admet_logp',
-        'admet_logs','admet_gi','admet_bbb','admet_lipinski','admet_ghose',
-        'admet_veber','admet_egan','admet_muegge','admet_bioavail',
-        'admet_synAccess','admet_ld50','admet_hepato','admet_carcino',
-        'admet_immuno','admet_mutagen','admet_cyto','admet_ghs'
-      ];
-      let filled = 0;
-      fieldMap.forEach(id => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        const val = parsed[id];
-        if (val !== undefined && val !== null && val !== '') {
-          if (el.tagName === 'SELECT') {
-            // Try to match option
-            const opts = Array.from(el.options).map(o => o.value);
-            const match = opts.find(o => o.toLowerCase() === String(val).toLowerCase());
-            if (match !== undefined) { el.value = match; filled++; }
-            else { el.value = val; filled++; }
-          } else {
-            el.value = val;
-            filled++;
-          }
-        }
-      });
-
-      setFetchStatus('✓ Auto-filled ' + filled + '/25 fields from SMILES. Review and edit if needed, then click "Add compound".', 'var(--accent)');
-
-    } catch(err) {
-      setFetchStatus('Error: ' + err.message, 'var(--error)');
-    } finally {
-      admetAutoFetchBtn.disabled = false;
-      admetAutoFetchBtn.textContent = '⚡ Auto-fetch ADME & Toxicity';
     }
+
+    setFetchStatus('Step 2/2 — Querying ProTox-3 for toxicity data…', 'var(--text-dim)');
+
+    // ── Step 2: ProTox-3 ──
+    try {
+      tox = await fetchProTox3(smiles);
+      toxSource = 'ProTox-3';
+    } catch (e) {
+      toxError = 'ProTox-3 unreachable via proxy. Toxicity fields left blank.';
+    }
+
+    // ── Fill form fields ──
+    const fieldMap = {
+      admet_mw         : adme.mw,
+      admet_heavyAtoms : adme.heavyAtoms,
+      admet_aromAtoms  : adme.aromAtoms,
+      admet_rotBonds   : adme.rotBonds,
+      admet_hAcceptors : adme.hAcceptors,
+      admet_hDonors    : adme.hDonors,
+      admet_molarRef   : adme.molarRef,
+      admet_logp       : adme.logp,
+      admet_logs       : adme.logs,
+      admet_gi         : adme.gi,
+      admet_bbb        : adme.bbb,
+      admet_lipinski   : adme.lipinski,
+      admet_ghose      : adme.ghose,
+      admet_veber      : adme.veber,
+      admet_egan       : adme.egan,
+      admet_muegge     : adme.muegge,
+      admet_bioavail   : adme.bioavail,
+      admet_synAccess  : adme.synAccess,
+      admet_ld50       : tox.ld50,
+      admet_hepato     : tox.hepato,
+      admet_carcino    : tox.carcino,
+      admet_immuno     : tox.immuno,
+      admet_mutagen    : tox.mutagen,
+      admet_cyto       : tox.cyto,
+      admet_ghs        : tox.ghs,
+    };
+
+    let filled = 0;
+    for (const [id, val] of Object.entries(fieldMap)) {
+      if (!val) continue;
+      const el = document.getElementById(id);
+      if (!el) continue;
+      if (el.tagName === 'SELECT') {
+        const opts = Array.from(el.options).map(o => o.value.toLowerCase());
+        const match = Array.from(el.options).find(o => o.value.toLowerCase() === String(val).toLowerCase());
+        if (match) { el.value = match.value; filled++; }
+        else { el.value = val; filled++; }
+      } else {
+        el.value = val; filled++;
+      }
+    }
+
+    // Status message
+    const admeFilledCount = Object.values(adme).filter(v => v && v.length > 0).length;
+    const toxFilledCount  = Object.values(tox).filter(v => v && v.length > 0).length;
+
+    let statusParts = [];
+    if (admeFilledCount > 0) statusParts.push(`✓ ADME: ${admeFilledCount} fields from ${admeSource}`);
+    if (admeError)           statusParts.push(`⚠ ${admeError}`);
+    if (toxFilledCount > 0)  statusParts.push(`✓ Toxicity: ${toxFilledCount} fields from ${toxSource}`);
+    if (toxError)            statusParts.push(`⚠ ${toxError}`);
+
+    if (filled === 0) {
+      setFetchStatus(
+        'Both sources were unreachable via CORS proxy.\n\n' +
+        'Tip: Open SwissADME (swissadme.ch) and ProTox-3 (tox-new.charite.de) manually and paste your SMILES, then copy the values into the form fields below.',
+        'var(--amber)'
+      );
+    } else {
+      statusParts.push(`\nTotal: ${filled} fields filled. Review and edit if needed, then click "Add compound".`);
+      setFetchStatus(statusParts.join('\n'), filled > 5 ? 'var(--accent)' : 'var(--amber)');
+    }
+
+    admetAutoFetchBtn.disabled = false;
+    admetAutoFetchBtn.textContent = '⚡ Auto-fetch ADME & Toxicity';
   });
 
 </script>
