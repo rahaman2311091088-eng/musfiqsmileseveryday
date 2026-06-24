@@ -697,6 +697,91 @@
   }
   .admet-row-remove:hover { border-color: var(--error); }
 
+  /* ── SwissADME / ProTox paste parser ───────────────────────── */
+  .paste-parser-wrap {
+    background: rgba(127,231,196,0.04);
+    border: 1px dashed var(--accent-dim);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 22px;
+  }
+  .paste-parser-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .paste-parser-title svg { width: 14px; height: 14px; }
+  .paste-parser-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .paste-parser-tab {
+    background: var(--bg);
+    border: 1px solid var(--panel-line);
+    border-radius: 5px;
+    color: var(--text-dim);
+    font-size: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    padding: 5px 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .paste-parser-tab.active { background: var(--accent); color: #0A1721; border-color: var(--accent); font-weight: 700; }
+  .paste-parser-tab:not(.active):hover { border-color: var(--accent-dim); color: var(--text); }
+  textarea#swissadmePaste, textarea#protoxPaste {
+    width: 100%;
+    min-height: 90px;
+    resize: vertical;
+    background: var(--bg);
+    border: 1px solid var(--panel-line);
+    border-radius: 6px;
+    color: var(--text-dim);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color 0.15s ease;
+  }
+  textarea#swissadmePaste:focus, textarea#protoxPaste:focus {
+    border-color: var(--accent-dim);
+    box-shadow: 0 0 0 3px rgba(127,231,196,0.1);
+  }
+  textarea#swissadmePaste::placeholder, textarea#protoxPaste::placeholder {
+    color: var(--slate); font-family: 'Inter', sans-serif; font-size: 12px;
+  }
+  .paste-parser-actions { display: flex; gap: 8px; margin-top: 10px; align-items: center; flex-wrap: wrap; }
+  button#parsePasteBtn {
+    background: var(--accent);
+    color: #0A1721;
+    font-size: 13px;
+    padding: 9px 18px;
+  }
+  button#parsePasteBtn:hover { background: #9CF0D6; }
+  button#clearPasteBtn {
+    background: transparent;
+    border: 1px solid var(--panel-line);
+    color: var(--text-dim);
+    font-size: 13px;
+    padding: 9px 14px;
+  }
+  button#clearPasteBtn:hover { border-color: var(--slate); color: var(--text); }
+  #parseResultMsg {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    display: none;
+  }
+  #parseResultMsg.error { color: var(--error); }
+  #parseResultMsg.show { display: inline; }
+
   /* ── ADMET tab wide layout ─────────────────────────────────── */
   #admetTab { width: 100%; max-width: 1400px; }
   #admetTab .console { padding: 28px 32px; }
@@ -841,6 +926,29 @@
         <div class="count-badge"><b id="admetCountBadge">0</b> added</div>
       </div>
 
+      <!-- SwissADME / ProTox paste parser -->
+      <div class="paste-parser-wrap">
+        <div class="paste-parser-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+          Paste &amp; Auto-fill from SwissADME or ProTox-3
+        </div>
+        <div class="paste-parser-tabs">
+          <button class="paste-parser-tab active" data-target="swissadmePastePanel">SwissADME</button>
+          <button class="paste-parser-tab" data-target="protoxPastePanel">ProTox-3</button>
+        </div>
+        <div id="swissadmePastePanel">
+          <textarea id="swissadmePaste" placeholder="Copy the full SwissADME result text (SMILES line + all sections) and paste it here…"></textarea>
+        </div>
+        <div id="protoxPastePanel" style="display:none;">
+          <textarea id="protoxPaste" placeholder="Copy the ProTox-3 result text (LD50, Hepatotoxicity, Carcinogenicity, etc.) and paste it here…"></textarea>
+        </div>
+        <div class="paste-parser-actions">
+          <button id="parsePasteBtn">⚡ Auto-fill fields</button>
+          <button id="clearPasteBtn">Clear paste</button>
+          <span id="parseResultMsg"></span>
+        </div>
+      </div>
+
       <div class="admet-field-row">
         <div class="admet-field admet-field-wide">
           <label>Compound (CID or Name)</label>
@@ -912,7 +1020,7 @@
         </div>
         <div class="admet-field">
           <label>Bioavailability Score</label>
-          <select id="admet_bioavail"><option value="">—</option><option>0.17</option><option>0.55</option></select>
+          <select id="admet_bioavail"><option value="">—</option><option>0.17</option><option>0.55</option><option>0.85</option></select>
         </div>
       </div>
 
@@ -2004,6 +2112,195 @@
 
   admetRenderList();
 
+  // ── Paste parser: SwissADME / ProTox-3 ──────────────────────────
+  const pasteParserTabs = document.querySelectorAll('.paste-parser-tab');
+  pasteParserTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      pasteParserTabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('swissadmePastePanel').style.display =
+        tab.dataset.target === 'swissadmePastePanel' ? '' : 'none';
+      document.getElementById('protoxPastePanel').style.display =
+        tab.dataset.target === 'protoxPastePanel' ? '' : 'none';
+      document.getElementById('parseResultMsg').classList.remove('show', 'error');
+    });
+  });
+
+  function getActivePasteTab() {
+    return [...pasteParserTabs].find(t => t.classList.contains('active'))?.dataset.target;
+  }
+
+  function showParseMsg(msg, isError) {
+    const el = document.getElementById('parseResultMsg');
+    el.textContent = msg;
+    el.classList.toggle('error', !!isError);
+    el.classList.add('show');
+  }
+
+  function setSelectVal(id, val) {
+    const el = document.getElementById(id);
+    if (!el) return false;
+    const lower = String(val).toLowerCase().trim();
+    for (const opt of el.options) {
+      if (opt.value.toLowerCase() === lower || opt.text.toLowerCase() === lower) {
+        el.value = opt.value;
+        return true;
+      }
+    }
+    // Value not in options — add it dynamically
+    const opt = document.createElement('option');
+    opt.value = val; opt.textContent = val;
+    el.appendChild(opt);
+    el.value = val;
+    return true;
+  }
+
+  function parseSwissADME(text) {
+    function grab(pattern) {
+      const m = text.match(pattern);
+      return m ? m[1].trim() : null;
+    }
+    let filled = 0;
+
+    // SMILES — first line starting with "SMILES"
+    const smiles = grab(/^SMILES\s+(\S+)/m);
+    if (smiles) { document.getElementById('admetSmilesInput').value = smiles; filled++; }
+
+    // Molecular weight
+    const mw = grab(/Molecular weight\s+([\d.]+)\s*g\/mol/i);
+    if (mw) { document.getElementById('admet_mw').value = mw; filled++; }
+
+    // Heavy atoms
+    const heavy = grab(/Num\.\s*heavy atoms\s+(\d+)/i);
+    if (heavy) { document.getElementById('admet_heavyAtoms').value = heavy; filled++; }
+
+    // Aromatic heavy atoms
+    const arom = grab(/Num\.\s*arom\.\s*heavy atoms\s+(\d+)/i);
+    if (arom) { document.getElementById('admet_aromAtoms').value = arom; filled++; }
+
+    // Rotatable bonds
+    const rot = grab(/Num\.\s*rotatable bonds\s+(\d+)/i);
+    if (rot) { document.getElementById('admet_rotBonds').value = rot; filled++; }
+
+    // H-bond acceptors
+    const hAcc = grab(/Num\.\s*H-bond acceptors\s+(\d+)/i);
+    if (hAcc) { document.getElementById('admet_hAcceptors').value = hAcc; filled++; }
+
+    // H-bond donors
+    const hDon = grab(/Num\.\s*H-bond donors\s+(\d+)/i);
+    if (hDon) { document.getElementById('admet_hDonors').value = hDon; filled++; }
+
+    // Molar refractivity
+    const mr = grab(/Molar Refractivity\s+([\d.]+)/i);
+    if (mr) { document.getElementById('admet_molarRef').value = mr; filled++; }
+
+    // Log P — prefer Consensus Log Po/w, fallback to XLOGP3
+    const logpConsensus = grab(/Consensus Log Po\/w\s+([\d.+-]+)/i);
+    const logpX = grab(/Log Po\/w \(XLOGP3\)\s+([\d.+-]+)/i);
+    const logpVal = logpConsensus || logpX;
+    if (logpVal) { document.getElementById('admet_logp').value = logpVal; filled++; }
+
+    // Log S ESOL
+    const logs = grab(/Log S \(ESOL\)\s+([\d.+-]+)/i);
+    if (logs) { document.getElementById('admet_logs').value = logs; filled++; }
+
+    // GI absorption
+    const gi = grab(/GI absorption\s+(\w+)/i);
+    if (gi) { setSelectVal('admet_gi', gi.charAt(0).toUpperCase() + gi.slice(1).toLowerCase()); filled++; }
+
+    // BBB permeant
+    const bbb = grab(/BBB permeant\s+(\w+)/i);
+    if (bbb) { setSelectVal('admet_bbb', bbb.charAt(0).toUpperCase() + bbb.slice(1).toLowerCase()); filled++; }
+
+    // Drug-likeness filters — match start of line to avoid partial matches
+    const lipinski = grab(/^Lipinski\s+(Yes|No)/im);
+    if (lipinski) { setSelectVal('admet_lipinski', lipinski); filled++; }
+
+    // Violations number from e.g. "Yes; 0 violation" or "No; 2 violations"
+    const lipViol = grab(/Lipinski\s+(?:Yes|No);\s*(\d+)\s*violation/i);
+    if (lipViol) { setSelectVal('admet_lipinski_viol', lipViol); filled++; }
+
+    const ghose = grab(/^Ghose\s+(Yes|No)/im);
+    if (ghose) { setSelectVal('admet_ghose', ghose); filled++; }
+
+    const veber = grab(/^Veber\s+(Yes|No)/im);
+    if (veber) { setSelectVal('admet_veber', veber); filled++; }
+
+    const egan = grab(/^Egan\s+(Yes|No)/im);
+    if (egan) { setSelectVal('admet_egan', egan); filled++; }
+
+    const muegge = grab(/^Muegge\s+(Yes|No)/im);
+    if (muegge) { setSelectVal('admet_muegge', muegge); filled++; }
+
+    // Bioavailability Score
+    const bioavail = grab(/Bioavailability Score\s+([\d.]+)/i);
+    if (bioavail) { setSelectVal('admet_bioavail', bioavail); filled++; }
+
+    // Synthetic accessibility
+    const syn = grab(/Synthetic accessibility\s+([\d.]+)/i);
+    if (syn) { document.getElementById('admet_synAccess').value = syn; filled++; }
+
+    return filled;
+  }
+
+  function parseProTox(text) {
+    function grab(pattern) {
+      const m = text.match(pattern);
+      return m ? m[1].trim() : null;
+    }
+    let filled = 0;
+
+    // LD50
+    const ld50 = grab(/LD50[^\d]*([\d.]+)\s*mg\/kg/i);
+    if (ld50) { document.getElementById('admet_ld50').value = ld50; filled++; }
+
+    // GHS class — Acute Oral Toxicity
+    const ghs = grab(/(?:Predicted GHS category|Acute Oral Toxicity|GHS\s*(?:class|category)?)[^\d]*([1-5])/i);
+    if (ghs) { setSelectVal('admet_ghs', ghs); filled++; }
+
+    // Endpoint activity fields
+    const endpoints = [
+      ['admet_hepato', /Hepatotoxicity\s+(Active|Inactive)/i],
+      ['admet_carcino', /Carcinogenicity\s+(Active|Inactive)/i],
+      ['admet_immuno', /Immunotoxicity\s+(Active|Inactive)/i],
+      ['admet_mutagen', /Mutagenicity\s+(Active|Inactive)/i],
+      ['admet_cyto', /Cytotoxicity\s+(Active|Inactive)/i],
+    ];
+    for (const [id, re] of endpoints) {
+      const val = grab(re);
+      if (val) {
+        setSelectVal(id, val.charAt(0).toUpperCase() + val.slice(1).toLowerCase());
+        filled++;
+      }
+    }
+
+    return filled;
+  }
+
+  document.getElementById('parsePasteBtn').addEventListener('click', () => {
+    const activePanel = getActivePasteTab();
+    const isSwiss = activePanel === 'swissadmePastePanel';
+    const text = document.getElementById(isSwiss ? 'swissadmePaste' : 'protoxPaste').value.trim();
+
+    if (!text) {
+      showParseMsg('Paste some data first.', true);
+      return;
+    }
+
+    const filled = isSwiss ? parseSwissADME(text) : parseProTox(text);
+
+    if (filled === 0) {
+      showParseMsg('No recognizable fields found. Make sure you copied the full result text.', true);
+    } else {
+      showParseMsg(`✓ ${filled} field${filled !== 1 ? 's' : ''} auto-filled — review then click Add compound.`, false);
+    }
+  });
+
+  document.getElementById('clearPasteBtn').addEventListener('click', () => {
+    document.getElementById('swissadmePaste').value = '';
+    document.getElementById('protoxPaste').value = '';
+    document.getElementById('parseResultMsg').classList.remove('show', 'error');
+  });
 
 </script>
 
