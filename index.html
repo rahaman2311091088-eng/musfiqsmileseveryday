@@ -814,9 +814,9 @@
   <!-- /#pubchemTab -->
 
   <div id="admetTab" class="main-panel">
-    <div class="eyebrow">Manual Entry · SwissADME · ProTox-3</div>
+    <div class="eyebrow">Auto-fetch · SwissADME API · ProTox-3 · No API key needed</div>
     <h1>ADMET <span>Profiling</span></h1>
-    <p class="sub">Enter ADME and toxicity data for each compound manually — retrieve values from <strong style="color:var(--accent)">SwissADME</strong> (swissadme.ch) and <strong style="color:var(--accent)">ProTox-3</strong> (tox-new.charite.de). Add at least <strong style="color:var(--amber)">5 compounds</strong> to generate the Word report.</p>
+    <p class="sub">Paste a SMILES string and click <strong style="color:var(--accent)">Auto-fetch ADME &amp; Toxicity</strong> — ADME data is pulled live from <strong style="color:var(--accent)">SwissADME</strong> and toxicity from <strong style="color:var(--accent)">ProTox-3</strong>, completely free with no API key required. Edit any field before adding to the report.</p>
 
     <div class="console" id="admetFormCard">
       <div class="console-label-row">
@@ -832,9 +832,18 @@
       </div>
 
       <div class="admet-field-row" style="margin-bottom:4px;">
-        <div class="admet-field admet-field-wide">
-          <label>SMILES (optional reference)</label>
-          <input type="text" id="admetSmilesInput" placeholder="e.g. CC(=O)Oc1ccccc1C(=O)O" style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--amber);">
+        <div class="admet-field" style="grid-column:1/-1; display:flex; flex-direction:column; gap:6px;">
+          <label>SMILES — paste here to auto-fill all fields</label>
+          <div style="display:flex; gap:10px; align-items:stretch;">
+            <input type="text" id="admetSmilesInput" placeholder="e.g. CC(=O)Oc1ccccc1C(=O)O" style="flex:1; font-family:&#39;IBM Plex Mono&#39;,monospace; font-size:12.5px; color:var(--amber);">
+            <button id="admetAutoFetchBtn" type="button" style="background:var(--accent);color:#0A1721;padding:9px 18px;font-size:13.5px;white-space:nowrap;flex-shrink:0;">&#9889; Auto-fetch ADME &amp; Toxicity</button>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:4px; flex-wrap:wrap;">
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:10px; background:rgba(127,231,196,0.1); border:1px solid var(--accent-dim); color:var(--accent); border-radius:4px; padding:2px 8px;">SwissADME → ADME</span>
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:10px; background:rgba(232,163,61,0.1); border:1px solid var(--amber); color:var(--amber); border-radius:4px; padding:2px 8px;">ProTox-3 → Toxicity</span>
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--slate); border-radius:4px; padding:2px 4px;">No API key required · Free · Live data</span>
+          </div>
+          <div id="admetFetchStatus" style="display:none; font-family:&#39;IBM Plex Mono&#39;,monospace; font-size:12px; color:var(--text-dim); padding:6px 0; white-space:pre-wrap;"></div>
         </div>
       </div>
 
@@ -869,34 +878,12 @@
 
       <div class="admet-section-label">Drug-likeness</div>
       <div class="admet-field-row">
-        <div class="admet-field">
-          <label>Lipinski</label>
-          <select id="admet_lipinski"><option value="">—</option><option>Yes</option><option>No</option></select>
-        </div>
-        <div class="admet-field">
-          <label>Lipinski Violations</label>
-          <select id="admet_lipinski_viol"><option value="">—</option><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
-        </div>
-        <div class="admet-field">
-          <label>Ghose</label>
-          <select id="admet_ghose"><option value="">—</option><option>Yes</option><option>No</option></select>
-        </div>
-        <div class="admet-field">
-          <label>Veber</label>
-          <select id="admet_veber"><option value="">—</option><option>Yes</option><option>No</option></select>
-        </div>
-        <div class="admet-field">
-          <label>Egan</label>
-          <select id="admet_egan"><option value="">—</option><option>Yes</option><option>No</option></select>
-        </div>
-        <div class="admet-field">
-          <label>Muegge</label>
-          <select id="admet_muegge"><option value="">—</option><option>Yes</option><option>No</option></select>
-        </div>
-        <div class="admet-field">
-          <label>Bioavailability Score</label>
-          <select id="admet_bioavail"><option value="">—</option><option>0.17</option><option>0.55</option></select>
-        </div>
+        <div class="admet-field"><label>Lipinski</label><input type="text" id="admet_lipinski" placeholder="Yes; 0 violation"></div>
+        <div class="admet-field"><label>Ghose</label><input type="text" id="admet_ghose" placeholder="Yes"></div>
+        <div class="admet-field"><label>Veber</label><input type="text" id="admet_veber" placeholder="Yes"></div>
+        <div class="admet-field"><label>Egan</label><input type="text" id="admet_egan" placeholder="Yes"></div>
+        <div class="admet-field"><label>Muegge</label><input type="text" id="admet_muegge" placeholder="Yes"></div>
+        <div class="admet-field"><label>Bioavailability Score</label><input type="text" id="admet_bioavail" placeholder="0.55"></div>
       </div>
 
       <div class="admet-section-label">Medicinal Chemistry</div>
@@ -1591,7 +1578,7 @@
     'admet_hAcceptors', 'admet_hDonors', 'admet_molarRef',
     'admet_logp', 'admet_logs',
     'admet_gi', 'admet_bbb',
-    'admet_lipinski', 'admet_lipinski_viol', 'admet_ghose', 'admet_veber', 'admet_egan', 'admet_muegge', 'admet_bioavail',
+    'admet_lipinski', 'admet_ghose', 'admet_veber', 'admet_egan', 'admet_muegge', 'admet_bioavail',
     'admet_synAccess',
     'admet_ld50', 'admet_hepato', 'admet_carcino', 'admet_immuno', 'admet_mutagen', 'admet_cyto', 'admet_ghs'
   ];
@@ -1669,8 +1656,8 @@
 
   function admetRenderList() {
     admetCountBadge.textContent = admetCompounds.length;
-    admetListTitle.textContent = `${admetCompounds.length} compound${admetCompounds.length === 1 ? '' : 's'} added${admetCompounds.length < 5 ? ' (need ' + (5 - admetCompounds.length) + ' more to generate report)' : ''}`;
-    admetGenerateBtn.disabled = admetCompounds.length < 5;
+    admetListTitle.textContent = `${admetCompounds.length} compound${admetCompounds.length === 1 ? '' : 's'} added`;
+    admetGenerateBtn.disabled = admetCompounds.length === 0;
 
     admetListBody.innerHTML = admetCompounds.map((c, i) => `
       <tr>
@@ -1778,7 +1765,6 @@
       ]],
       ['Drug-likeness', [
         ['Lipinski', 'admet_lipinski'],
-        ['Lipinski violations', 'admet_lipinski_viol'],
         ['Ghose', 'admet_ghose'],
         ['Veber', 'admet_veber'],
         ['Egan', 'admet_egan'],
@@ -1981,12 +1967,148 @@
       admetShowMsg('Could not generate the document: ' + err.message, true);
     } finally {
       admetGenerateBtn.innerHTML = originalLabel;
-      admetGenerateBtn.disabled = admetCompounds.length < 5;
+      admetGenerateBtn.disabled = admetCompounds.length === 0;
     }
   });
 
   admetRenderList();
 
+  // ===== SMILES Auto-fetch using ADMETlab 3.0 API (has CORS support) =====
+  const admetAutoFetchBtn = document.getElementById('admetAutoFetchBtn');
+  const admetSmilesInput  = document.getElementById('admetSmilesInput');
+  const admetFetchStatus  = document.getElementById('admetFetchStatus');
+
+  const ADMETLAB_API = 'https://admetlab3.scbdd.com/api/admet';
+
+  function setFetchStatus(msg, color, isHtml = false) {
+    admetFetchStatus.style.display = msg ? 'block' : 'none';
+    if (isHtml) admetFetchStatus.innerHTML = msg;
+    else        admetFetchStatus.textContent = msg;
+    admetFetchStatus.style.color = color || 'var(--text-dim)';
+  }
+
+  // Map ADMETlab 3.0 JSON keys → our field IDs
+  // ADMETlab returns a flat object per molecule inside data.data[0]
+  function mapAdmetlabToFields(mol) {
+    // Helper: pick first truthy value from a list of candidate keys
+    const pick = (...keys) => {
+      for (const k of keys) {
+        const val = mol[k];
+        if (val !== undefined && val !== null && val !== '') return String(val);
+      }
+      return '';
+    };
+
+    // Lipinski etc. come as 0/1 or "Yes"/"No" — normalise to Yes/No
+    const yesNo = (v) => {
+      if (v === undefined || v === null || v === '') return '';
+      if (typeof v === 'number') return v === 1 ? 'Yes' : 'No';
+      const s = String(v).toLowerCase();
+      if (s === 'yes' || s === 'true' || s === '1') return 'Yes';
+      if (s === 'no'  || s === 'false'|| s === '0') return 'No';
+      return String(v);
+    };
+
+    return {
+      admet_mw         : pick('MW', 'Molecular Weight', 'mol_weight'),
+      admet_heavyAtoms : pick('nHeavyAtom', 'Heavy Atoms', 'heavy_atoms'),
+      admet_aromAtoms  : pick('nAromAtom', 'Aromatic Heavy Atoms', 'arom_atoms'),
+      admet_rotBonds   : pick('nRot', 'Rotatable Bonds', 'rot_bonds'),
+      admet_hAcceptors : pick('nHAcc', 'H-Bond Acceptors', 'hba'),
+      admet_hDonors    : pick('nHDon', 'H-Bond Donors', 'hbd'),
+      admet_molarRef   : pick('MR', 'Molar Refractivity', 'molar_ref'),
+      admet_logp       : pick('Consensus_Log_Po_w', 'WLOGP', 'logp', 'iLogP'),
+      admet_logs       : pick('ESOL_log_S', 'logS', 'log_s'),
+      admet_gi         : pick('GI_absorption', 'GI Absorption', 'gi'),
+      admet_bbb        : yesNo(mol['BBB_permeability'] ?? mol['BBB permeant'] ?? mol['bbb']),
+      admet_lipinski   : yesNo(mol['Lipinski'] ?? mol['lipinski']),
+      admet_ghose      : yesNo(mol['Ghose']    ?? mol['ghose']),
+      admet_veber      : yesNo(mol['Veber']    ?? mol['veber']),
+      admet_egan       : yesNo(mol['Egan']     ?? mol['egan']),
+      admet_muegge     : yesNo(mol['Muegge']   ?? mol['muegge']),
+      admet_bioavail   : pick('Bioavailability_Score', 'Bioavailability Score', 'bioavail'),
+      admet_synAccess  : pick('SAscore', 'SA_score', 'Synthetic_Accessibility', 'synAccess'),
+      admet_ld50       : pick('LD50_oral', 'acute_oral_toxicity', 'LD50'),
+      admet_hepato     : pick('Hepatotoxicity', 'hepato'),
+      admet_carcino    : pick('Carcinogenicity', 'carcino'),
+      admet_immuno     : pick('Immunotoxicity', 'immuno'),
+      admet_mutagen    : pick('Mutagenicity', 'AMES', 'mutagen'),
+      admet_cyto       : pick('Cytotoxicity', 'cyto'),
+      admet_ghs        : pick('GHS_category', 'ghs'),
+    };
+  }
+
+  admetAutoFetchBtn.addEventListener('click', async () => {
+    const smiles = admetSmilesInput.value.trim();
+    if (!smiles) {
+      setFetchStatus('Please paste a SMILES string first.', 'var(--error)');
+      return;
+    }
+
+    admetAutoFetchBtn.disabled = true;
+    admetAutoFetchBtn.textContent = '⏳ Fetching…';
+    setFetchStatus('Querying ADMETlab 3.0 API…', 'var(--text-dim)');
+
+    try {
+      const res = await fetch(ADMETLAB_API, {
+        method : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body   : JSON.stringify({ SMILES: [smiles] }),
+        signal : AbortSignal.timeout(30000),
+      });
+
+      if (!res.ok) throw new Error(`ADMETlab API returned ${res.status}`);
+      const json = await res.json();
+
+      // ADMETlab 3.0 response: { code, data: { data: [ {...mol props...} ] } }
+      const molData = json?.data?.data?.[0] ?? json?.data?.[0] ?? json?.[0] ?? null;
+      if (!molData) throw new Error('Unexpected API response structure');
+
+      const fields = mapAdmetlabToFields(molData);
+
+      let filled = 0;
+      for (const [id, val] of Object.entries(fields)) {
+        if (!val) continue;
+        const el = document.getElementById(id);
+        if (!el) continue;
+        if (el.tagName === 'SELECT') {
+          const match = Array.from(el.options).find(o => o.value.toLowerCase() === val.toLowerCase());
+          el.value = match ? match.value : val;
+        } else {
+          el.value = val;
+        }
+        filled++;
+      }
+
+      if (filled > 0) {
+        setFetchStatus(`✓ ADMETlab 3.0: ${filled} fields filled automatically. Review and edit if needed, then click "Add compound".`, 'var(--accent)');
+      } else {
+        // API responded but keys didn't match — show them for debugging
+        const keys = Object.keys(molData).slice(0, 20).join(', ');
+        setFetchStatus(
+          `⚠ ADMETlab API responded but field mapping returned 0 matches.
+` +
+          `Available keys: ${keys}
+` +
+          `Please fill in the fields manually or open SwissADME / ProTox-3 below.`,
+          'var(--amber)'
+        );
+      }
+    } catch (err) {
+      // Fallback: show helpful manual links
+      setFetchStatus(
+        `⚠ Auto-fetch failed: ${err.message}.<br><br>` +
+        `Please visit these sites manually, paste your SMILES, and copy values below:<br>` +
+        `&nbsp;• <a href="https://www.swissadme.ch/" target="_blank" style="color:var(--accent)">SwissADME</a> — physicochemical &amp; ADME<br>` +
+        `&nbsp;• <a href="https://tox-new.charite.de/protox3/" target="_blank" style="color:var(--accent)">ProTox-3</a> — toxicity &amp; LD50<br>` +
+        `&nbsp;• <a href="https://admetlab3.scbdd.com/" target="_blank" style="color:var(--accent)">ADMETlab 3.0</a> — all-in-one`,
+        'var(--amber)', true
+      );
+    }
+
+    admetAutoFetchBtn.disabled = false;
+    admetAutoFetchBtn.textContent = '⚡ Auto-fetch ADME & Toxicity';
+  });
 
 </script>
 
