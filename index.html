@@ -516,19 +516,19 @@
   </div>
   <div class="eyebrow">Live · PubChem PUG REST</div>
   <h1>Batch CID Lookup <span>console</span></h1>
-  <p class="sub">Paste up to 50 PubChem Compound IDs — comma, space, or line separated — to pull CID, name, SMILES, molecular formula, and molecular weight for all of them at once, then download the set as a spreadsheet.</p>
+  <p class="sub">Paste up to 50 PubChem Compound IDs or compound names — comma or line separated — to pull CID, name, SMILES, molecular formula, and molecular weight for all of them at once, then download the set as a spreadsheet.</p>
 
   <div class="console">
     <div class="console-label-row">
-      <div class="console-label">Compound IDs (max 50)</div>
+      <div class="console-label">CIDs or compound names (max 50)</div>
       <div class="count-badge" id="countBadge"><b>0</b> / 50</div>
     </div>
-    <textarea id="cidInput" placeholder="2244, 1983, 5793&#10;or one per line:&#10;2244&#10;1983&#10;5793"></textarea>
+    <textarea id="cidInput" placeholder="2244, aspirin, 1983, caffeine&#10;or one per line:&#10;2244&#10;aspirin&#10;ascorbic acid"></textarea>
     <div class="console-actions">
       <button id="fetchBtn">Fetch all</button>
       <button id="clearBtn">Clear</button>
     </div>
-    <div class="hint">Try a sample set: <button id="sampleBtn">aspirin, caffeine, glucose, ibuprofen, paracetamol</button></div>
+    <div class="hint">Try a mixed sample: <button id="sampleBtn">2244, caffeine, 5793, ibuprofen, paracetamol</button></div>
   </div>
 
   <div class="progress-wrap" id="progressWrap">
@@ -767,16 +767,16 @@
     return div.innerHTML;
   }
 
-  function parseCids(raw) {
+  function parseEntries(raw) {
     return raw
-      .split(/[\s,]+/)
+      .split(/[\n,]+/)
       .map(s => s.trim())
       .filter(Boolean);
   }
 
   function updateCount() {
-    const cids = parseCids(cidInput.value);
-    const n = cids.length;
+    const entries = parseEntries(cidInput.value);
+    const n = entries.length;
     countBadge.innerHTML = `<b>${n}</b> / ${MAX_CIDS}`;
     countBadge.classList.toggle('over', n > MAX_CIDS);
   }
@@ -792,7 +792,7 @@
   });
 
   sampleBtn.addEventListener('click', () => {
-    cidInput.value = '2244, 2519, 5793, 3672, 1983';
+    cidInput.value = '2244, caffeine, 5793, ibuprofen, paracetamol';
     updateCount();
     runBatch();
   });
@@ -804,19 +804,31 @@
   }
   function hideState() { stateBox.classList.remove('active'); }
 
-  async function runBatch() {
-    const cids = [...new Set(parseCids(cidInput.value))];
+  async function resolveEntryToCid(entry) {
+    if (/^\d+$/.test(entry)) {
+      return { cid: entry, inputLabel: entry };
+    }
+    try {
+      const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(entry)}/cids/JSON`;
+      const res = await fetch(url);
+      if (!res.ok) return { cid: null, inputLabel: entry };
+      const data = await res.json();
+      const cid = data?.IdentifierList?.CID?.[0];
+      return cid ? { cid: String(cid), inputLabel: entry } : { cid: null, inputLabel: entry };
+    } catch (e) {
+      return { cid: null, inputLabel: entry };
+    }
+  }
 
-    if (cids.length === 0) {
-      showState('Add at least one PubChem CID — for example, 2244.', true);
+  async function runBatch() {
+    const entries = [...new Set(parseEntries(cidInput.value))];
+
+    if (entries.length === 0) {
+      showState('Add at least one PubChem CID or compound name — for example, 2244 or aspirin.', true);
       return;
     }
-    if (cids.length > MAX_CIDS) {
-      showState(`You've entered ${cids.length} CIDs. Trim the list to ${MAX_CIDS} or fewer and try again.`, true);
-      return;
-    }
-    if (!cids.every(c => /^\d+$/.test(c))) {
-      showState('Every entry must be a numeric CID, like 2244. Remove any non-numeric values.', true);
+    if (entries.length > MAX_CIDS) {
+      showState(`You've entered ${entries.length} entries. Trim the list to ${MAX_CIDS} or fewer and try again.`, true);
       return;
     }
 
@@ -825,57 +837,79 @@
     fetchBtn.disabled = true;
     downloadBtn.disabled = true;
     progressWrap.classList.add('active');
-    progressText.textContent = 'Fetching properties…';
-    progressCount.textContent = `0 / ${cids.length}`;
+    progressText.textContent = 'Resolving names to CIDs…';
+    progressCount.textContent = `0 / ${entries.length}`;
     progressFill.style.width = '5%';
 
     let results = [];
 
     try {
-      const propUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cids.join(',')}/property/IUPACName,SMILES,ConnectivitySMILES,MolecularFormula,MolecularWeight/JSON`;
-      const propRes = await fetch(propUrl);
+      // Step 1: resolve every entry (CID passthrough, or name -> CID lookup) in parallel
+      const resolved = await Promise.all(entries.map(resolveEntryToCid));
+      progressFill.style.width = '30%';
 
-      let propsByCid = {};
-      if (propRes.ok) {
-        const data = await propRes.json();
-        const list = data?.PropertyTable?.Properties || [];
-        list.forEach(p => { propsByCid[String(p.CID)] = p; });
-      }
+      const unresolved = resolved.filter(r => !r.cid);
+      const okResolved = resolved.filter(r => r.cid);
+      const cids = [...new Set(okResolved.map(r => r.cid))];
 
-      progressFill.style.width = '40%';
-      progressText.textContent = 'Resolving common names…';
+      // Map back from CID to the original input label(s) that resolved to it
+      const cidToInputs = {};
+      okResolved.forEach(r => {
+        if (!cidToInputs[r.cid]) cidToInputs[r.cid] = [];
+        cidToInputs[r.cid].push(r.inputLabel);
+      });
 
-      let done = 0;
-      for (const cid of cids) {
-        const props = propsByCid[cid];
-        let row;
-        if (!props) {
-          row = { cid, name: '', formula: '', smiles: '', error: 'No record found for this CID' };
-        } else {
-          const smiles = props.SMILES || props.ConnectivitySMILES || props.CanonicalSMILES || '';
-          let name = props.IUPACName || '';
-          row = { cid, name, formula: props.MolecularFormula || '', weight: props.MolecularWeight || '', smiles, error: smiles ? null : 'SMILES not available' };
+      unresolved.forEach(r => {
+        results.push({ cid: '—', inputLabel: r.inputLabel, name: '', formula: '', weight: '', smiles: '', error: `Could not find a compound for "${r.inputLabel}"` });
+      });
+
+      if (cids.length > 0) {
+        progressText.textContent = 'Fetching properties…';
+        const propUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cids.join(',')}/property/IUPACName,SMILES,ConnectivitySMILES,MolecularFormula,MolecularWeight/JSON`;
+        const propRes = await fetch(propUrl);
+
+        let propsByCid = {};
+        if (propRes.ok) {
+          const data = await propRes.json();
+          const list = data?.PropertyTable?.Properties || [];
+          list.forEach(p => { propsByCid[String(p.CID)] = p; });
         }
-        results.push(row);
-        done++;
-        progressCount.textContent = `${done} / ${cids.length}`;
-        progressFill.style.width = `${40 + (done / cids.length) * 40}%`;
-      }
 
-      // Best-effort: fetch friendlier common names in parallel, don't block on failures
-      progressText.textContent = 'Polishing names…';
-      await Promise.all(results.map(async (row) => {
-        if (row.error) return;
-        try {
-          const synRes = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${row.cid}/synonyms/JSON`);
-          if (synRes.ok) {
-            const synData = await synRes.json();
-            const syns = synData?.InformationList?.Information?.[0]?.Synonym;
-            if (syns && syns.length > 0) row.name = syns[0];
+        progressFill.style.width = '60%';
+
+        let done = 0;
+        for (const cid of cids) {
+          const props = propsByCid[cid];
+          const inputLabel = (cidToInputs[cid] || [cid]).join(', ');
+          let row;
+          if (!props) {
+            row = { cid, inputLabel, name: '', formula: '', weight: '', smiles: '', error: 'No record found for this CID' };
+          } else {
+            const smiles = props.SMILES || props.ConnectivitySMILES || props.CanonicalSMILES || '';
+            let name = props.IUPACName || '';
+            row = { cid, inputLabel, name, formula: props.MolecularFormula || '', weight: props.MolecularWeight || '', smiles, error: smiles ? null : 'SMILES not available' };
           }
-        } catch (e) { /* keep IUPAC name fallback */ }
-        if (!row.name) row.name = `CID ${row.cid}`;
-      }));
+          results.push(row);
+          done++;
+          progressCount.textContent = `${done} / ${cids.length}`;
+          progressFill.style.width = `${60 + (done / cids.length) * 25}%`;
+        }
+
+        // Best-effort: fetch friendlier common names in parallel, don't block on failures
+        progressText.textContent = 'Polishing names…';
+        await Promise.all(results.map(async (row) => {
+          if (row.error || !row.cid || row.cid === '—') return;
+          try {
+            const synRes = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${row.cid}/synonyms/JSON`);
+            if (synRes.ok) {
+              const synData = await synRes.json();
+              const syns = synData?.InformationList?.Information?.[0]?.Synonym;
+              if (syns && syns.length > 0) row.name = syns[0];
+            }
+          } catch (e) { /* keep IUPAC name fallback */ }
+          if (!row.name) row.name = `CID ${row.cid}`;
+        }));
+      }
 
       progressFill.style.width = '100%';
 
