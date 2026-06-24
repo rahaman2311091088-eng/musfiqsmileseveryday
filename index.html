@@ -1978,32 +1978,46 @@
   const admetSmilesInput  = document.getElementById('admetSmilesInput');
   const admetFetchStatus  = document.getElementById('admetFetchStatus');
 
-  // CORS proxy — used for both SwissADME and ProTox-3 since they don't send CORS headers
-  const CORS_PROXY = 'https://corsproxy.io/?';
+  // CORS proxy list — tried in order until one works
+  const CORS_PROXIES = [
+    'https://api.allorigins.win/raw?url=',
+    'https://corsproxy.io/?',
+    'https://cors-anywhere.herokuapp.com/',
+    'https://thingproxy.freeboard.io/fetch/',
+  ];
 
-  function setFetchStatus(msg, color) {
+  async function fetchWithCorsProxy(url, options = {}) {
+    let lastErr;
+    for (const proxy of CORS_PROXIES) {
+      try {
+        const proxyUrl = proxy + encodeURIComponent(url);
+        const res = await fetch(proxyUrl, { ...options, signal: AbortSignal.timeout(10000) });
+        if (res.ok) return res;
+        lastErr = new Error(`HTTP ${res.status}`);
+      } catch (e) { lastErr = e; }
+    }
+    throw lastErr || new Error('All CORS proxies failed');
+  }
+
+  function setFetchStatus(msg, color, isHtml = false) {
     admetFetchStatus.style.display = msg ? 'block' : 'none';
-    admetFetchStatus.textContent   = msg;
+    if (isHtml) admetFetchStatus.innerHTML = msg;
+    else        admetFetchStatus.textContent = msg;
     admetFetchStatus.style.color   = color || 'var(--text-dim)';
   }
 
   // ── SwissADME ──────────────────────────────────────────────────────────────
-  // SwissADME has a simple POST form endpoint. We submit the SMILES and parse
-  // the returned HTML for the property table.
   async function fetchSwissADME(smiles) {
     const TARGET = 'http://www.swissadme.ch/include/submitjob.php';
     const body   = new URLSearchParams({ smiles });
 
-    // 1. Submit job and get a job-id redirect / result page
-    const submitRes = await fetch(CORS_PROXY + encodeURIComponent(TARGET), {
+    const submitRes = await fetchWithCorsProxy(TARGET, {
       method : 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body
     });
-    if (!submitRes.ok) throw new Error(`SwissADME submit failed: ${submitRes.status}`);
     const submitText = await submitRes.text();
 
-    // Try to extract the result URL from a meta-refresh or redirect
     let resultUrl = '';
     const metaMatch = submitText.match(/url=([^"'>\s]+)/i);
     if (metaMatch) {
@@ -2012,12 +2026,10 @@
         : 'http://www.swissadme.ch/' + metaMatch[1];
     }
 
-    // If no redirect found, the result might be inline
     let html = submitText;
     if (resultUrl) {
-      await new Promise(r => setTimeout(r, 2500)); // wait for server processing
-      const resultRes = await fetch(CORS_PROXY + encodeURIComponent(resultUrl));
-      if (!resultRes.ok) throw new Error(`SwissADME result fetch failed: ${resultRes.status}`);
+      await new Promise(r => setTimeout(r, 2500));
+      const resultRes = await fetchWithCorsProxy(resultUrl);
       html = await resultRes.text();
     }
 
@@ -2073,13 +2085,18 @@
     return result;
   }
 
-  // Fallback: if SwissADME scraping yields mostly empty results, try their CSV endpoint
+  // Fallback: try SwissADME direct API then proxy
   async function fetchSwissADME_CSV(smiles) {
-    // SwissADME also exposes a direct CSV endpoint via their API
     const apiUrl = `https://swissadme.ch/swissadme/run.php?smiles=${encodeURIComponent(smiles)}`;
-    const res = await fetch(CORS_PROXY + encodeURIComponent(apiUrl));
-    if (!res.ok) throw new Error('SwissADME CSV endpoint failed');
-    const text = await res.text();
+    let text = '';
+    try {
+      const direct = await fetch(apiUrl, { signal: AbortSignal.timeout(8000) });
+      if (direct.ok) { text = await direct.text(); }
+    } catch (_) {}
+    if (!text) {
+      const res = await fetchWithCorsProxy(apiUrl);
+      text = await res.text();
+    }
     return parseSwissADME_CSV(text);
   }
 
@@ -2128,12 +2145,11 @@
     const TARGET = 'https://tox-new.charite.de/protox3/index.php?site=compound_input';
     const body   = new URLSearchParams({ smiles_input: smiles, 'submit': 'Predict toxicity' });
 
-    const res = await fetch(CORS_PROXY + encodeURIComponent(TARGET), {
+    const res = await fetchWithCorsProxy(TARGET, {
       method : 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body
     });
-    if (!res.ok) throw new Error(`ProTox-3 submit failed: ${res.status}`);
     const html = await res.text();
     return parseProTox3(html);
   }
@@ -2318,10 +2334,13 @@
     if (toxError)            statusParts.push(`⚠ ${toxError}`);
 
     if (filled === 0) {
+      const smilesEncoded = encodeURIComponent(smiles);
       setFetchStatus(
-        'Both sources were unreachable via CORS proxy.\n\n' +
-        'Tip: Open SwissADME (swissadme.ch) and ProTox-3 (tox-new.charite.de) manually and paste your SMILES, then copy the values into the form fields below.',
-        'var(--amber)'
+        `⚠ Auto-fetch could not reach the external servers (CORS restriction).<br><br>` +
+        `Please visit these sites manually, paste your SMILES, and copy the values into the fields below:<br>` +
+        `&nbsp;• <a href="https://www.swissadme.ch/" target="_blank" style="color:var(--accent)">SwissADME</a> — for ADME properties<br>` +
+        `&nbsp;• <a href="https://tox-new.charite.de/protox3/" target="_blank" style="color:var(--accent)">ProTox-3</a> — for toxicity data`,
+        'var(--amber)', true
       );
     } else {
       statusParts.push(`\nTotal: ${filled} fields filled. Review and edit if needed, then click "Add compound".`);
