@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Batch CID Lookup — PubChem Console | Md Musfiqur Rahaman</title>
+<title>Drug Design Universe — PubChem Batch Lookup | Md Musfiqur Rahaman</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -44,7 +44,7 @@
     * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
   }
 
-  .scope { width: 100%; max-width: 760px; }
+  .scope { width: 100%; max-width: 900px; }
 
   .eyebrow {
     font-family: 'IBM Plex Mono', monospace;
@@ -71,10 +71,10 @@
 
   h1 {
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 28px;
-    font-weight: 600;
+    font-size: 30px;
+    font-weight: 700;
     margin: 0 0 10px;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
   }
   h1 span { color: var(--text-dim); font-weight: 400; }
 
@@ -90,8 +90,9 @@
   .console {
     background: var(--bg-raised);
     border: 1px solid var(--panel-line);
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 22px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
   }
 
   .console-label-row {
@@ -212,22 +213,35 @@
   }
 
   /* Results */
-  .results-wrap { margin-top: 28px; display: none; }
+  .results-wrap { margin-top: 32px; display: none; }
   .results-wrap.active { display: block; }
 
   .results-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 14px;
+    margin-bottom: 16px;
     flex-wrap: wrap;
     gap: 12px;
+    padding: 0 2px;
   }
 
   .results-title {
     font-family: 'IBM Plex Mono', monospace;
     font-size: 13px;
     color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .results-title::before {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
+    flex-shrink: 0;
   }
   .results-title b { color: var(--accent); }
   .results-title .err-count { color: var(--error); }
@@ -275,52 +289,66 @@
     text-decoration: none;
   }
 
+  /* ── Table wrapper: horizontal scroll so columns never get clipped ── */
   .table-card {
     background: var(--bg-raised);
     border: 1px solid var(--panel-line);
-    border-radius: 10px;
+    border-radius: 12px;
     overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+  }
+
+  .table-scroll {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   table {
     width: 100%;
+    min-width: 780px;        /* forces scroll before columns collapse   */
     border-collapse: collapse;
-    font-size: 13.5px;
+    font-size: 13px;
   }
 
   thead th {
     text-align: left;
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 10.5px;
-    letter-spacing: 0.08em;
+    font-size: 10px;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--slate);
-    padding: 12px 14px;
+    padding: 11px 12px;
     border-bottom: 1px solid var(--panel-line);
-    background: rgba(255,255,255,0.015);
+    background: rgba(255,255,255,0.018);
     white-space: nowrap;
+    position: sticky;
+    top: 0;
   }
 
-  tbody tr { border-bottom: 1px solid var(--panel-line); }
+  tbody tr { border-bottom: 1px solid var(--panel-line); transition: background 0.1s; }
   tbody tr:last-child { border-bottom: none; }
-  tbody tr:hover { background: rgba(255,255,255,0.02); }
-  tbody tr.row-error { background: rgba(232, 101, 74, 0.05); }
+  tbody tr:hover { background: rgba(127,231,196,0.04); }
+  tbody tr.row-error { background: rgba(232,101,74,0.05); }
 
   td {
-    padding: 11px 14px;
-    vertical-align: top;
+    padding: 10px 12px;
+    vertical-align: middle;
   }
 
   td.cid-cell {
     font-family: 'IBM Plex Mono', monospace;
     color: var(--amber);
-    font-weight: 600;
+    font-weight: 700;
     white-space: nowrap;
+    font-size: 12.5px;
   }
 
   td.name-cell {
     font-weight: 500;
-    max-width: 200px;
+    min-width: 120px;
+    max-width: 180px;
+    word-break: break-word;
   }
 
   td.name-cell a {
@@ -338,13 +366,14 @@
     font-family: 'IBM Plex Mono', monospace;
     color: var(--text-dim);
     white-space: nowrap;
+    font-size: 12px;
   }
 
   td.smiles-cell {
     font-family: 'IBM Plex Mono', monospace;
     color: var(--accent);
-    font-size: 12.5px;
-    max-width: 280px;
+    font-size: 11.5px;
+    max-width: 200px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -352,13 +381,20 @@
 
   td.smiles-cell.is-error { color: var(--error); font-family: 'Inter', sans-serif; font-size: 13px; }
 
-  td.struct-cell { width: 56px; }
+  /* Action cells — fixed narrow width, no wrapping */
+  td.action-cell {
+    white-space: nowrap;
+    padding: 10px 8px;
+  }
+
+  td.struct-cell { width: 52px; padding: 8px 10px; }
   .mini-struct {
-    width: 44px; height: 44px;
+    width: 42px; height: 42px;
     background: #fff;
-    border-radius: 6px;
+    border-radius: 7px;
     overflow: hidden;
     display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
   }
   .mini-struct img { width: 100%; height: 100%; object-fit: contain; }
 
@@ -391,10 +427,52 @@
     outline-offset: 2px;
   }
 
-  @media (max-width: 600px) {
-    td.smiles-cell, td.name-cell { max-width: 120px; }
-    .results-header { flex-direction: column; align-items: flex-start; }
+  /* ── Responsive / mobile ────────────────────────────────────── */
+  @media (max-width: 700px) {
+    body { padding: 28px 12px 60px; }
+    h1 { font-size: 22px; }
+    .sub { font-size: 13.5px; }
+    .scope { max-width: 100%; }
+
+    .results-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .results-header > div { width: 100%; }
+    .results-header > div button { width: 100%; justify-content: center; }
+
+    /* Table scrolls horizontally on mobile — no column hiding */
+    .table-scroll { border-radius: 0; }
+
+    .topbar { flex-wrap: wrap; gap: 6px; }
+    .topbar-user { font-size: 11px; gap: 6px; }
+    #signOutBtn { font-size: 11px; padding: 5px 10px; }
+
+    .console { padding: 16px; }
+    textarea#cidInput { font-size: 13px; min-height: 90px; }
+    button#fetchBtn, button#clearBtn { padding: 11px 16px; font-size: 13px; }
+
+    .auth-card { padding: 20px 16px; }
   }
+
+  @media (max-width: 420px) {
+    h1 { font-size: 19px; }
+    .eyebrow { font-size: 10px; }
+    button { font-size: 12.5px; }
+  }
+
+  /* ── Download button group ───────────────────────────────────── */
+  .dl-btn-group {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .dl-btn-group button {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    white-space: nowrap;
+    font-size: 13px;
+    padding: 10px 16px;
+  }
+  .dl-btn-group button svg { width: 15px; height: 15px; flex-shrink: 0; }
 
   /* Auth gate */
   #authScreen {
@@ -514,8 +592,8 @@
 <body>
 
 <div id="authScreen">
-  <div class="eyebrow" style="justify-content:center;">Sign in required</div>
-  <h1 style="text-align:center; font-size:22px;">Batch CID Lookup</h1>
+  <div class="eyebrow" style="justify-content:center;">Drug Design Universe · Sign in</div>
+  <h1 style="text-align:center; font-size:22px;">Drug Design <span>Universe</span></h1>
   <p class="sub" style="text-align:center; margin: 0 auto 28px;">Create a free account or sign in to use the portal.</p>
 
   <div class="auth-card">
@@ -559,7 +637,7 @@
     <div class="topbar-user">Signed in as <b id="userEmailLabel"></b><button id="signOutBtn">Sign out</button></div>
   </div>
   <div class="eyebrow">Live · PubChem PUG REST</div>
-  <h1>Batch CID Lookup <span>console</span></h1>
+  <h1>Drug Design <span>Universe</span></h1>
   <p class="sub">Paste up to 50 PubChem Compound IDs or compound names — one per line, or comma-separated for simple names. Chemical names containing commas (e.g. <em>12-Oxododecanoic acid, ethyl ester</em>) are automatically detected and kept as a single entry.</p>
 
   <div class="console">
@@ -585,18 +663,19 @@
   <div class="results-wrap" id="resultsWrap">
     <div class="results-header">
       <div class="results-title" id="resultsTitle"></div>
-      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <div class="dl-btn-group">
         <button id="downloadSdfBtn" disabled>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path></svg>
-          Download SDF ZIP (one file per molecule)
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          SDF ZIP
         </button>
         <button id="downloadBtn" disabled>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-          Download spreadsheet (.xlsx)
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 9h18M9 21V9"></path></svg>
+          Spreadsheet (.xlsx)
         </button>
       </div>
     </div>
     <div class="table-card">
+      <div class="table-scroll">
       <table>
         <thead>
           <tr>
@@ -606,13 +685,14 @@
             <th>Formula</th>
             <th>MW</th>
             <th>SMILES</th>
-            <th>3D</th>
-            <th>2D</th>
+            <th>3D SDF</th>
+            <th>2D SDF</th>
             <th>PubChem</th>
           </tr>
         </thead>
         <tbody id="resultsBody"></tbody>
       </table>
+      </div>
     </div>
   </div>
 
@@ -1179,9 +1259,9 @@
           <td class="formula-cell">${escapeHtml(r.formula)}</td>
           <td class="formula-cell">${escapeHtml(r.weight)}</td>
           <td class="smiles-cell" title="${escapeHtml(r.smiles)}">${escapeHtml(r.smiles)}</td>
-          <td><button class="sdf-link" data-cid="${escapeHtml(r.cid)}" data-name="${escapeHtml(r.name)}" data-dim="3d">3D</button></td>
-          <td><button class="sdf-link" data-cid="${escapeHtml(r.cid)}" data-name="${escapeHtml(r.name)}" data-dim="2d">2D</button></td>
-          <td><a class="sdf-link pubchem-link-row" href="https://pubchem.ncbi.nlm.nih.gov/compound/${escapeHtml(r.cid)}" target="_blank" rel="noopener" title="Open this compound on PubChem">View ↗</a></td>
+          <td class="action-cell"><button class="sdf-link" data-cid="${escapeHtml(r.cid)}" data-name="${escapeHtml(r.name)}" data-dim="3d">3D</button></td>
+          <td class="action-cell"><button class="sdf-link" data-cid="${escapeHtml(r.cid)}" data-name="${escapeHtml(r.name)}" data-dim="2d">2D</button></td>
+          <td class="action-cell"><a class="sdf-link pubchem-link-row" href="https://pubchem.ncbi.nlm.nih.gov/compound/${escapeHtml(r.cid)}" target="_blank" rel="noopener" title="Open this compound on PubChem">View ↗</a></td>
         </tr>`;
     }).join('');
 
