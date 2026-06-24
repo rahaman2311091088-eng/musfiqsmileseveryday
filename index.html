@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   :root {
     --bg: #0F1E2E;
@@ -559,19 +560,19 @@
   </div>
   <div class="eyebrow">Live · PubChem PUG REST</div>
   <h1>Batch CID Lookup <span>console</span></h1>
-  <p class="sub">Paste up to 50 PubChem Compound IDs or compound names — comma or line separated — to pull CID, name, SMILES, molecular formula, and molecular weight for all of them at once, then download the set as a spreadsheet.</p>
+  <p class="sub">Paste up to 50 PubChem Compound IDs or compound names — one per line, or comma-separated for simple names. Chemical names containing commas (e.g. <em>12-Oxododecanoic acid, ethyl ester</em>) are automatically detected and kept as a single entry.</p>
 
   <div class="console">
     <div class="console-label-row">
       <div class="console-label">CIDs or compound names (max 50)</div>
       <div class="count-badge" id="countBadge"><b>0</b> / 50</div>
     </div>
-    <textarea id="cidInput" placeholder="2244, aspirin, 1983, caffeine&#10;or one per line:&#10;2244&#10;aspirin&#10;ascorbic acid"></textarea>
+    <textarea id="cidInput" placeholder="One entry per line (recommended for chemical names):&#10;2244&#10;aspirin&#10;12-Oxododecanoic acid, ethyl ester&#10;&#10;Simple CIDs/names can also be comma-separated:&#10;2244, caffeine, 5793"></textarea>
     <div class="console-actions">
       <button id="fetchBtn">Fetch all</button>
       <button id="clearBtn">Clear</button>
     </div>
-    <div class="hint">Try a mixed sample: <button id="sampleBtn">2244, caffeine, 5793, ibuprofen, paracetamol</button></div>
+    <div class="hint">Try a sample (includes a name with a comma): <button id="sampleBtn">load sample</button></div>
   </div>
 
   <div class="progress-wrap" id="progressWrap">
@@ -587,7 +588,7 @@
       <div style="display:flex; gap:10px; flex-wrap:wrap;">
         <button id="downloadSdfBtn" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path></svg>
-          Download SDF (3D, or 2D if unavailable)
+          Download SDF ZIP (one file per molecule)
         </button>
         <button id="downloadBtn" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
@@ -893,57 +894,105 @@
 
     downloadSdfBtn.disabled = true;
     const originalLabel = downloadSdfBtn.innerHTML;
-    let collected3d = [];
-    let collected2d = [];
+
+    const zip = new JSZip();
+    const usedNames = {};
+    let count3d = 0, count2d = 0;
     let unavailable = [];
 
     for (let i = 0; i < okRows.length; i++) {
       const r = okRows[i];
-      downloadSdfBtn.textContent = `Fetching structures… ${i + 1}/${okRows.length}`;
+      downloadSdfBtn.textContent = `Building ZIP… ${i + 1} / ${okRows.length}`;
+
+      // Build a unique, safe filename for this molecule
+      let baseName = sanitizeFilename(r.name || ('CID_' + r.cid));
+      let fileName = baseName + '_CID' + r.cid;
+      if (usedNames[fileName]) {
+        usedNames[fileName]++;
+        fileName = fileName + '_' + usedNames[fileName];
+      } else {
+        usedNames[fileName] = 1;
+      }
+
       try {
         const { sdf, type } = await fetchSdfWithFallback(r.cid);
         const record = sdf.trim().endsWith('$$$$') ? sdf : sdf + '\n$$$$\n';
-        if (type === '3D') collected3d.push(record);
-        else collected2d.push(record);
+        const suffix = type === '3D' ? '_3D' : '_2D';
+        zip.file(fileName + suffix + '.sdf', record);
+        if (type === '3D') count3d++; else count2d++;
       } catch (err) {
         unavailable.push(r.name || r.cid);
       }
     }
 
-    downloadSdfBtn.innerHTML = originalLabel;
-    downloadSdfBtn.disabled = false;
-
-    const stamp = new Date().toISOString().slice(0, 10);
-    let downloadedAny = false;
-
-    if (collected3d.length > 0) {
-      triggerDownload(`pubchem-3d-conformers-${stamp}.sdf`, collected3d.join('\n'));
-      downloadedAny = true;
-    }
-    if (collected2d.length > 0) {
-      triggerDownload(`pubchem-2d-structures-${stamp}.sdf`, collected2d.join('\n'));
-      downloadedAny = true;
-    }
-
-    if (!downloadedAny) {
+    if (count3d === 0 && count2d === 0) {
+      downloadSdfBtn.innerHTML = originalLabel;
+      downloadSdfBtn.disabled = false;
       showState('No structure data was available for any compound in this set.', true);
       return;
     }
 
-    let msg = `Downloaded ${collected3d.length} 3D structure(s)`;
-    if (collected2d.length > 0) msg += ` and ${collected2d.length} 2D structure(s) (no 3D model available for those)`;
-    if (unavailable.length > 0) msg += `. No structure at all for: ${unavailable.join(', ')}`;
+    downloadSdfBtn.textContent = 'Compressing…';
+    const stamp = new Date().toISOString().slice(0, 10);
+    const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'pubchem-structures-' + stamp + '.zip';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    downloadSdfBtn.innerHTML = originalLabel;
+    downloadSdfBtn.disabled = false;
+
+    let msg = 'ZIP downloaded — ' + (count3d + count2d) + ' SDF file(s) inside';
+    if (count3d > 0 && count2d > 0) msg += ' (' + count3d + ' 3D, ' + count2d + ' 2D fallback)';
+    if (unavailable.length > 0) msg += '. No structure found for: ' + unavailable.join(', ');
     msg += '.';
-    showState(msg, unavailable.length > 0 && collected3d.length === 0 && collected2d.length === 0);
+    showState(msg, unavailable.length > 0 && count3d === 0 && count2d === 0);
   }
 
   downloadSdfBtn.addEventListener('click', downloadBulkSdf);
 
   function parseEntries(raw) {
-    return raw
-      .split(/[\n,]+/)
-      .map(s => s.trim())
-      .filter(Boolean);
+    // Split by newlines first — each line may be one entry or a comma-separated list of simple CIDs/names.
+    const lines = raw.split(/\n/).map(s => s.trim()).filter(Boolean);
+    const entries = [];
+
+    for (const line of lines) {
+      if (!line.includes(',')) {
+        // No comma at all — treat as single entry
+        entries.push(line);
+        continue;
+      }
+
+      // Line contains commas. Check if it looks like a chemical name that naturally
+      // contains commas (e.g. "12-Oxododecanoic acid, ethyl ester").
+      // Heuristic: if any comma-separated token (after trimming) contains a space AND
+      // starts with a lowercase letter or looks like a chemical suffix (ester, acid, etc.)
+      // it's almost certainly a compound name with an embedded comma — keep it whole.
+      const parts = line.split(',').map(s => s.trim()).filter(Boolean);
+      const looksLikeSplittable = parts.every(p => {
+        // A pure CID (all digits) is always safe to split
+        if (/^\d+$/.test(p)) return true;
+        // A simple single-word name with no spaces (e.g. "aspirin", "caffeine") is safe
+        if (!/\s/.test(p)) return true;
+        // A short phrase that starts with a capital and has no chemical suffixes is likely
+        // a distinct compound name entered on one line
+        return false;
+      });
+
+      if (looksLikeSplittable) {
+        entries.push(...parts);
+      } else {
+        // Treat the whole line as one compound name
+        entries.push(line);
+      }
+    }
+
+    return entries;
   }
 
   function updateCount() {
@@ -964,7 +1013,7 @@
   });
 
   sampleBtn.addEventListener('click', () => {
-    cidInput.value = '2244, caffeine, 5793, ibuprofen, paracetamol';
+    cidInput.value = '2244\ncaffeine\n5793\nibuprofen\nparacetamol\n12-Oxododecanoic acid, ethyl ester';
     updateCount();
     runBatch();
   });
