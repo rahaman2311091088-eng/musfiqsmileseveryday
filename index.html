@@ -3,7 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Drug Design Universe — PubChem Batch Lookup | Md Musfiqur Rahaman</title>
+<title>DDU — PubChem Batch Lookup & ADMET Profiling</title>
+<meta name="description" content="Drug Design Universe: Batch PubChem compound lookup, ADMET profiling, SwissADME & ProTox-3 integration, SDF/Excel export, and Word report generation for pharmaceutical research.">
+<meta name="keywords" content="PubChem, ADMET, drug design, SwissADME, ProTox, SMILES, CID, molecular properties, pharmacokinetics, drug-likeness, toxicity, pharmaceutical research">
+<meta name="author" content="Md Musfiqur Rahaman">
+<meta name="theme-color" content="#0F1E2E">
+<meta property="og:title" content="Drug Design Universe — PubChem & ADMET Platform">
+<meta property="og:description" content="Batch PubChem lookup, ADMET profiling, SwissADME/ProTox-3 integration, and research report generation.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Drug Design Universe">
+<meta name="twitter:description" content="Batch PubChem lookup, ADMET profiling, and research report generation for drug discovery.">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230F1E2E'/%3E%3Ccircle cx='16' cy='16' r='8' fill='none' stroke='%237FE7C4' stroke-width='2.5'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%237FE7C4'/%3E%3Cline x1='16' y1='2' x2='16' y2='8' stroke='%237FE7C4' stroke-width='1.5' stroke-linecap='round'/%3E%3Cline x1='16' y1='24' x2='16' y2='30' stroke='%237FE7C4' stroke-width='1.5' stroke-linecap='round'/%3E%3Cline x1='2' y1='16' x2='8' y2='16' stroke='%237FE7C4' stroke-width='1.5' stroke-linecap='round'/%3E%3Cline x1='24' y1='16' x2='30' y2='16' stroke='%237FE7C4' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -885,10 +896,336 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
   }
   .history-del-btn:hover { background: rgba(232,101,74,0.1); }
 
+  /* ── Toast Notification System ──────────────────────────────── */
+  #toastContainer {
+    position: fixed; top: 20px; right: 20px; z-index: 9999;
+    display: flex; flex-direction: column; gap: 10px;
+    pointer-events: none; max-width: 400px; width: calc(100% - 40px);
+  }
+  .toast {
+    pointer-events: auto;
+    background: var(--bg-raised); border: 1px solid var(--panel-line);
+    border-radius: 10px; padding: 14px 18px; display: flex; align-items: flex-start; gap: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3), 0 0 0 1px rgba(127,231,196,0.06);
+    animation: toastIn 0.28s ease-out; font-size: 13.5px; color: var(--text); line-height: 1.5;
+    transition: opacity 0.2s, transform 0.2s;
+  }
+  .toast.removing { opacity: 0; transform: translateX(40px); }
+  .toast-icon { flex-shrink: 0; width: 20px; height: 20px; margin-top: 1px; }
+  .toast-icon.success { color: var(--accent); }
+  .toast-icon.error { color: var(--error); }
+  .toast-icon.info { color: var(--amber); }
+  .toast-body { flex: 1; min-width: 0; }
+  .toast-title { font-weight: 700; font-size: 13px; margin-bottom: 2px; }
+  .toast-msg { color: var(--text-dim); font-size: 12.5px; }
+  .toast-close {
+    background: none; border: none; color: var(--slate); cursor: pointer;
+    padding: 2px; font-size: 16px; line-height: 1; flex-shrink: 0;
+    transition: color 0.15s;
+  }
+  .toast-close:hover { color: var(--text); }
+  .toast.success { border-left: 3px solid var(--accent); }
+  .toast.error { border-left: 3px solid var(--error); }
+  .toast.info { border-left: 3px solid var(--amber); }
+  @keyframes toastIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+
+  /* ── Skeleton Loading ───────────────────────────────────────── */
+  .skeleton { background: linear-gradient(90deg, var(--panel-line) 25%, rgba(127,231,196,0.06) 50%, var(--panel-line) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px; }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  .skeleton-row { display: flex; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--panel-line); }
+  .skeleton-row .skel { height: 14px; border-radius: 3px; }
+  .skeleton-row .skel.w40 { width: 40px; }
+  .skeleton-row .skel.w60 { width: 60px; }
+  .skeleton-row .skel.w80 { width: 80px; }
+  .skeleton-row .skel.w120 { width: 120px; }
+  .skeleton-row .skel.w160 { width: 160px; }
+  .skeleton-row .skel.w200 { width: 200px; }
+  .skeleton-row .skel.sq42 { width: 42px; height: 42px; border-radius: 7px; flex-shrink: 0; }
+
+  /* ── Empty State Views ──────────────────────────────────────── */
+  .empty-state {
+    padding: 48px 24px; text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+  }
+  .empty-state svg { width: 48px; height: 48px; color: var(--slate); opacity: 0.6; }
+  .empty-state-title { font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: var(--text-dim); font-weight: 600; }
+  .empty-state-desc { font-size: 13px; color: var(--slate); max-width: 400px; line-height: 1.5; }
+  .empty-state-action { margin-top: 6px; }
+
+  /* ── Drag & Drop Zone ──────────────────────────────────────── */
+  .drop-zone {
+    border: 2px dashed var(--panel-line); border-radius: 10px; padding: 20px;
+    text-align: center; transition: border-color 0.2s, background 0.2s; cursor: pointer;
+    margin-top: 12px; position: relative;
+  }
+  .drop-zone:hover { border-color: var(--accent-dim); }
+  .drop-zone.drag-over {
+    border-color: var(--accent); background: rgba(127,231,196,0.06);
+  }
+  .drop-zone-icon { color: var(--slate); margin-bottom: 8px; }
+  .drop-zone-text { font-size: 13px; color: var(--text-dim); }
+  .drop-zone-hint { font-size: 11.5px; color: var(--slate); margin-top: 4px; }
+  .drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+  /* ── Sortable Table Headers ─────────────────────────────────── */
+  thead th.sortable { cursor: pointer; user-select: none; position: relative; padding-right: 22px; }
+  thead th.sortable::after {
+    content: ''; position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent;
+    border-bottom: 5px solid var(--slate); opacity: 0.4;
+  }
+  thead th.sortable.sort-asc::after { border-bottom: none; border-top: 5px solid var(--accent); opacity: 1; }
+  thead th.sortable.sort-desc::after { border-bottom: 5px solid var(--accent); opacity: 1; border-top: none; }
+
+  /* ── Table Search Bar ───────────────────────────────────────── */
+  .table-toolbar {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    padding: 12px 0; flex-wrap: wrap;
+  }
+  .table-search {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--bg); border: 1px solid var(--panel-line); border-radius: 6px;
+    padding: 8px 12px; flex: 1; max-width: 320px; min-width: 180px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .table-search:focus-within { border-color: var(--accent-dim); box-shadow: 0 0 0 3px rgba(127,231,196,0.1); }
+  .table-search svg { width: 14px; height: 14px; color: var(--slate); flex-shrink: 0; }
+  .table-search input {
+    background: none; border: none; outline: none; color: var(--text);
+    font-size: 13px; font-family: 'Inter', sans-serif; width: 100%;
+  }
+  .table-search input::placeholder { color: var(--slate); }
+  .table-toolbar-right { display: flex; gap: 8px; align-items: center; }
+
+  /* ── Column Visibility Toggle ───────────────────────────────── */
+  .col-toggle-wrap { position: relative; }
+  .col-toggle-btn {
+    background: var(--bg); border: 1px solid var(--panel-line); border-radius: 6px;
+    color: var(--text-dim); font-size: 12px; padding: 8px 12px; cursor: pointer;
+    display: flex; align-items: center; gap: 6px; font-family: 'Inter', sans-serif;
+    transition: border-color 0.15s;
+  }
+  .col-toggle-btn:hover { border-color: var(--slate); color: var(--text); }
+  .col-toggle-dropdown {
+    position: absolute; top: calc(100% + 6px); right: 0; z-index: 100;
+    background: var(--bg-raised); border: 1px solid var(--panel-line); border-radius: 8px;
+    padding: 10px 12px; min-width: 180px; display: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+  .col-toggle-dropdown.open { display: block; }
+  .col-toggle-dropdown label {
+    display: flex; align-items: center; gap: 8px; padding: 5px 0;
+    font-size: 12.5px; color: var(--text-dim); cursor: pointer;
+  }
+  .col-toggle-dropdown label:hover { color: var(--text); }
+  .col-toggle-dropdown input[type="checkbox"] { accent-color: var(--accent); }
+
+  /* ── Pagination ─────────────────────────────────────────────── */
+  .pagination {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    padding: 14px 0; flex-wrap: wrap; font-size: 12.5px; color: var(--text-dim);
+  }
+  .pagination-controls { display: flex; gap: 4px; }
+  .pagination-controls button {
+    background: var(--bg); border: 1px solid var(--panel-line); color: var(--text-dim);
+    border-radius: 5px; padding: 6px 12px; font-size: 12px; cursor: pointer;
+    font-family: 'IBM Plex Mono', monospace; transition: all 0.15s;
+  }
+  .pagination-controls button:hover:not(:disabled) { border-color: var(--accent-dim); color: var(--text); }
+  .pagination-controls button.active { background: var(--accent); color: #0A1721; border-color: var(--accent); font-weight: 700; }
+  .pagination-controls button:disabled { opacity: 0.35; cursor: not-allowed; }
+  .pagination-info { font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; }
+
+  /* ── Keyboard Shortcuts Panel ───────────────────────────────── */
+  .kbd-panel {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 8000;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+  }
+  .kbd-panel.open { display: flex; }
+  .kbd-panel-card {
+    background: var(--bg-raised); border: 1px solid var(--panel-line);
+    border-radius: 12px; padding: 28px 32px; max-width: 520px; width: calc(100% - 40px);
+    box-shadow: 0 16px 48px rgba(0,0,0,0.4);
+    animation: kbdIn 0.2s ease-out;
+  }
+  @keyframes kbdIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+  .kbd-panel-title { font-family: 'IBM Plex Mono', monospace; font-size: 15px; font-weight: 700; margin-bottom: 18px; display: flex; align-items: center; gap: 10px; }
+  .kbd-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--panel-line); }
+  .kbd-row:last-child { border-bottom: none; }
+  .kbd-row .keys { display: flex; gap: 4px; }
+  .kbd-row kbd {
+    background: var(--bg); border: 1px solid var(--panel-line); border-radius: 4px;
+    padding: 3px 8px; font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+    color: var(--accent); min-width: 24px; text-align: center;
+  }
+  .kbd-row .desc { font-size: 12.5px; color: var(--text-dim); }
+
+  /* ── Tooltips ───────────────────────────────────────────────── */
+  [data-tip] { position: relative; }
+  [data-tip]::before {
+    content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); left: 50%;
+    transform: translateX(-50%); background: #1A2E3E; border: 1px solid var(--panel-line);
+    color: var(--text-dim); font-size: 11px; font-family: 'Inter', sans-serif;
+    padding: 5px 10px; border-radius: 5px; white-space: nowrap; pointer-events: none;
+    opacity: 0; transition: opacity 0.15s; z-index: 200;
+    max-width: 240px; white-space: normal; text-align: center;
+  }
+  [data-tip]:hover::before { opacity: 1; }
+
+  /* ── Comparison Modal ───────────────────────────────────────── */
+  .modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 7000;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-card {
+    background: var(--bg-raised); border: 1px solid var(--panel-line);
+    border-radius: 12px; max-width: 900px; width: calc(100% - 32px);
+    max-height: 85vh; overflow-y: auto; padding: 28px;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.4);
+    animation: kbdIn 0.2s ease-out;
+  }
+  .modal-close { float: right; background: none; border: none; color: var(--slate); font-size: 20px; cursor: pointer; padding: 4px 8px; transition: color 0.15s; }
+  .modal-close:hover { color: var(--text); }
+
+  /* ── Statistics Panel ───────────────────────────────────────── */
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px; margin: 16px 0;
+  }
+  .stat-card {
+    background: var(--bg); border: 1px solid var(--panel-line);
+    border-radius: 8px; padding: 14px 16px;
+  }
+  .stat-label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--slate); margin-bottom: 6px; }
+  .stat-value { font-size: 22px; font-weight: 700; color: var(--accent); font-family: 'IBM Plex Mono', monospace; }
+  .stat-sub { font-size: 11.5px; color: var(--text-dim); margin-top: 3px; }
+
+  /* ── Duplicate Warning ──────────────────────────────────────── */
+  .dup-warning {
+    background: rgba(232,163,61,0.08); border: 1px solid rgba(232,163,61,0.25);
+    border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; gap: 10px;
+    margin-bottom: 12px; font-size: 12.5px; color: var(--amber);
+  }
+  .dup-warning svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+  /* ── Validation Status Badge ────────────────────────────────── */
+  .val-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; font-weight: 600;
+    padding: 3px 9px; border-radius: 20px; letter-spacing: 0.04em;
+  }
+  .val-badge.ok { background: rgba(127,231,196,0.12); color: var(--accent); }
+  .val-badge.warn { background: rgba(232,163,61,0.12); color: var(--amber); }
+  .val-badge.bad { background: rgba(232,101,74,0.12); color: var(--error); }
+
+  /* ── Data Completeness Bar ──────────────────────────────────── */
+  .completeness-bar {
+    height: 4px; background: var(--panel-line); border-radius: 2px; overflow: hidden; margin-top: 4px;
+  }
+  .completeness-fill {
+    height: 100%; border-radius: 2px; transition: width 0.4s ease;
+  }
+  .completeness-fill.high { background: var(--accent); }
+  .completeness-fill.med { background: var(--amber); }
+  .completeness-fill.low { background: var(--error); }
+
+  /* ── Comparison Table ───────────────────────────────────────── */
+  .compare-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .compare-table th { text-align: left; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--slate); padding: 10px 14px; background: rgba(255,255,255,0.02); border-bottom: 1px solid var(--panel-line); }
+  .compare-table td { padding: 8px 14px; border-bottom: 1px solid var(--panel-line); color: var(--text-dim); }
+  .compare-table tr:hover td { background: rgba(127,231,196,0.03); }
+  .compare-table .prop-label { font-weight: 600; color: var(--text); font-size: 12px; white-space: nowrap; }
+  .compare-table .diff-val { color: var(--amber); }
+
+  /* ── Smooth transitions ─────────────────────────────────────── */
+  .results-wrap, .state-box, .progress-wrap { transition: opacity 0.2s ease; }
+  tbody tr { transition: background 0.12s ease, opacity 0.2s ease; }
+  button, input, select, textarea { transition: all 0.15s ease; }
+
+  /* ── Export Progress Modal ──────────────────────────────────── */
+  .export-progress-card {
+    background: var(--bg-raised); border: 1px solid var(--panel-line);
+    border-radius: 10px; padding: 24px; max-width: 420px; width: 100%;
+    text-align: center;
+  }
+  .export-progress-card .progress-track { height: 8px; margin-top: 16px; border-radius: 4px; }
+  .export-progress-card .progress-fill { border-radius: 4px; }
+  .export-progress-label { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 10px; }
+
+  /* ── Summary Analysis Section ───────────────────────────────── */
+  .summary-section {
+    background: var(--bg-raised); border: 1px solid var(--panel-line);
+    border-radius: 12px; padding: 22px; margin-top: 20px;
+  }
+  .summary-title {
+    font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--accent-dim); margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .summary-title::before {
+    content: ''; display: inline-block; width: 6px; height: 6px;
+    border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px var(--accent);
+  }
+  .distribution-bar {
+    display: flex; height: 20px; border-radius: 4px; overflow: hidden;
+    background: var(--panel-line); margin: 6px 0;
+  }
+  .distribution-bar .seg { transition: width 0.4s ease; min-width: 1px; }
+  .distribution-bar .seg.yes { background: var(--accent); }
+  .distribution-bar .seg.no { background: var(--error); }
+  .distribution-bar .seg.na { background: var(--slate); }
+  .dist-labels { display: flex; gap: 16px; font-size: 11px; color: var(--text-dim); margin-top: 4px; flex-wrap: wrap; }
+  .dist-labels span { display: flex; align-items: center; gap: 5px; }
+  .dist-labels .dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+  .dist-labels .dot.yes { background: var(--accent); }
+  .dist-labels .dot.no { background: var(--error); }
+  .dist-labels .dot.na { background: var(--slate); }
+
+  /* ── Recently opened files ──────────────────────────────────── */
+  .recent-files { margin-top: 12px; }
+  .recent-file-item {
+    display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+    border: 1px solid var(--panel-line); border-radius: 6px; margin-bottom: 6px;
+    cursor: pointer; transition: border-color 0.15s, background 0.15s;
+  }
+  .recent-file-item:hover { border-color: var(--accent-dim); background: rgba(127,231,196,0.03); }
+  .recent-file-icon { color: var(--accent-dim); flex-shrink: 0; }
+  .recent-file-name { font-size: 12.5px; color: var(--text); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .recent-file-date { font-size: 10.5px; color: var(--slate); flex-shrink: 0; }
+
+  /* ── Tab indicators ─────────────────────────────────────────── */
+  .main-tab .tab-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--accent); color: #0A1721; font-size: 10px; font-weight: 700;
+    min-width: 18px; height: 18px; border-radius: 9px; padding: 0 5px;
+    margin-left: 6px; font-family: 'IBM Plex Mono', monospace;
+  }
+  .main-tab.active .tab-badge { background: #0A1721; color: var(--accent); }
 
 </style>
 </head>
 <body>
+
+<div id="toastContainer"></div>
+
+<div class="kbd-panel" id="kbdPanel">
+  <div class="kbd-panel-card">
+    <div class="kbd-panel-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/></svg>
+      Keyboard Shortcuts
+    </div>
+    <div class="kbd-row"><div class="desc">Fetch compounds</div><div class="keys"><kbd>Ctrl</kbd><kbd>Enter</kbd></div></div>
+    <div class="kbd-row"><div class="desc">Clear input</div><div class="keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>X</kbd></div></div>
+    <div class="kbd-row"><div class="desc">Export spreadsheet</div><div class="keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>E</kbd></div></div>
+    <div class="kbd-row"><div class="desc">Download SDF ZIP</div><div class="keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>S</kbd></div></div>
+    <div class="kbd-row"><div class="desc">Show shortcuts</div><div class="keys"><kbd>Ctrl</kbd><kbd>/</kbd></div></div>
+    <div class="kbd-row"><div class="desc">Close panel / dialog</div><div class="keys"><kbd>Esc</kbd></div></div>
+    <div class="kbd-row"><div class="desc">Focus CID input</div><div class="keys"><kbd>Ctrl</kbd><kbd>K</kbd></div></div>
+  </div>
+</div>
 
 <div id="authScreen">
   <div class="eyebrow" style="justify-content:center;">Drug Design Universe · Sign in</div>
@@ -927,7 +1264,10 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
     <div class="auth-msg" id="authMsg"></div>
   </div>
 
-  <footer style="margin-top:32px;">Created by <strong style="color: var(--text-dim);">Md Musfiqur Rahaman</strong> &middot; Department of Pharmacy &middot; Daffodil International University</footer>
+  <footer style="margin-top:32px; text-align:center;">
+    <div style="margin-bottom:8px;">Created by <strong style="color: var(--text-dim);">Md Musfiqur Rahaman</strong> &middot; Department of Pharmacy &middot; Daffodil International University</div>
+    <div style="font-size:10.5px; color:var(--slate);">DDU v2.1.0 &middot; Build 2026-06-25</div>
+  </footer>
 </div>
 
 <div id="appScreen">
@@ -938,7 +1278,7 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
 
   <div class="main-tabs">
     <button class="main-tab active" data-panel="pubchemTab">PubChem Lookup</button>
-    <button class="main-tab" data-panel="admetTab">ADMET Profiling</button>
+    <button class="main-tab" data-panel="admetTab">ADMET Profiling<span class="tab-badge" id="admetTabBadge" style="display:none;"></span></button>
   </div>
 
   <div id="pubchemTab" class="main-panel active">
@@ -955,7 +1295,17 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
       <button id="fetchBtn">Fetch all</button>
       <button id="clearBtn">Clear</button>
     </div>
-    <div class="hint">Try a sample (includes a name with a comma): <button id="sampleBtn">load sample</button></div>
+    <div class="hint">Try a sample (includes a name with a comma): <button id="sampleBtn">load sample</button> · or <button id="dropToggleBtn">drop an Excel file</button></div>
+
+    <!-- Drag & Drop Excel Upload Zone -->
+    <div class="drop-zone" id="dropZone" style="display:none;">
+      <div class="drop-zone-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      </div>
+      <div class="drop-zone-text">Drop an <strong>.xlsx</strong> or <strong>.csv</strong> file here, or click to browse</div>
+      <div class="drop-zone-hint">First column values will be used as CIDs or compound names</div>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+    </div>
   </div>
 
   <div class="progress-wrap" id="progressWrap">
@@ -969,6 +1319,14 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
     <div class="results-header">
       <div class="results-title" id="resultsTitle"></div>
       <div class="dl-btn-group">
+        <button id="compareBtn" disabled data-tip="Compare selected compounds side-by-side">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="18" rx="1"/></svg>
+          Compare
+        </button>
+        <button id="statsBtn" disabled data-tip="View batch statistics & summary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          Statistics
+        </button>
         <button id="downloadSdfBtn" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
           SDF ZIP
@@ -979,24 +1337,81 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
         </button>
       </div>
     </div>
+
+    <!-- Duplicate Warning -->
+    <div class="dup-warning" id="dupWarning" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span id="dupWarningText"></span>
+    </div>
+
+    <!-- Table Toolbar: Search, Column Toggle -->
+    <div class="table-toolbar" id="tableToolbar" style="display:none;">
+      <div class="table-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="tableSearchInput" placeholder="Filter results by name, CID, SMILES…">
+      </div>
+      <div class="table-toolbar-right">
+        <div class="col-toggle-wrap">
+          <button class="col-toggle-btn" id="colToggleBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            Columns
+          </button>
+          <div class="col-toggle-dropdown" id="colToggleDropdown">
+            <label><input type="checkbox" checked data-col="struct">Structure</label>
+            <label><input type="checkbox" checked data-col="cid">CID</label>
+            <label><input type="checkbox" checked data-col="name">Name</label>
+            <label><input type="checkbox" checked data-col="formula">Formula</label>
+            <label><input type="checkbox" checked data-col="mw">MW</label>
+            <label><input type="checkbox" checked data-col="smiles">SMILES</label>
+            <label><input type="checkbox" checked data-col="3d">3D SDF</label>
+            <label><input type="checkbox" checked data-col="2d">2D SDF</label>
+            <label><input type="checkbox" checked data-col="pubchem">PubChem</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="table-card">
       <div class="table-scroll">
-      <table>
+      <table id="pubchemTable">
         <thead>
           <tr>
-            <th></th>
-            <th>CID</th>
-            <th>Name</th>
-            <th>Formula</th>
-            <th>MW</th>
-            <th>SMILES</th>
-            <th>3D SDF</th>
-            <th>2D SDF</th>
-            <th>PubChem</th>
+            <th class="col-struct" data-col="struct"></th>
+            <th class="sortable col-cid" data-col="cid" data-sort="cid">CID</th>
+            <th class="sortable col-name" data-col="name" data-sort="name">Name</th>
+            <th class="sortable col-formula" data-col="formula" data-sort="formula">Formula</th>
+            <th class="sortable col-mw" data-col="mw" data-sort="weight">MW</th>
+            <th class="sortable col-smiles" data-col="smiles" data-sort="smiles">SMILES</th>
+            <th class="col-3d" data-col="3d">3D SDF</th>
+            <th class="col-2d" data-col="2d">2D SDF</th>
+            <th class="col-pubchem" data-col="pubchem">PubChem</th>
           </tr>
         </thead>
         <tbody id="resultsBody"></tbody>
       </table>
+      </div>
+      <!-- Empty state (shown when table has no rows) -->
+      <div class="empty-state" id="emptyState" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <div class="empty-state-title">No compounds found</div>
+        <div class="empty-state-desc">Enter CIDs or compound names above and click Fetch all, or drop an Excel file to get started.</div>
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination" id="pagination" style="display:none;">
+      <div class="pagination-info" id="paginationInfo"></div>
+      <div class="pagination-controls" id="paginationControls"></div>
+    </div>
+
+    <!-- Batch Statistics / Summary Section -->
+    <div class="summary-section" id="pubchemSummary" style="display:none;">
+      <div class="summary-title">Batch Statistics & Summary</div>
+      <div class="stats-grid" id="pubchemStatsGrid"></div>
+      <div id="pubchemDistributions" style="margin-top:16px;"></div>
+      <div style="margin-top:18px;">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--slate); margin-bottom:8px;">Data Completeness</div>
+        <div id="pubchemCompleteness"></div>
       </div>
     </div>
   </div>
@@ -1189,6 +1604,7 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
               <th>Compound</th>
               <th>M.W.</th>
               <th>LogP</th>
+              <th>SMILES</th>
               <th>GI abs.</th>
               <th>LD50</th>
               <th></th>
@@ -1217,8 +1633,48 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
   </div>
   <!-- /#admetTab -->
 
-  <footer>Data via <a href="https://pubchem.ncbi.nlm.nih.gov/" target="_blank" rel="noopener">PubChem</a> · <a href="https://www.swissadme.ch/" target="_blank" rel="noopener">SwissADME</a> · <a href="https://tox-new.charite.de/protox3/" target="_blank" rel="noopener">ProTox-3</a></footer>
-  <footer style="margin-top: 10px;">Created by <strong style="color: var(--text-dim);">Md Musfiqur Rahaman</strong> &middot; Department of Pharmacy &middot; Daffodil International University</footer>
+  <footer>
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <div>Data via <a href="https://pubchem.ncbi.nlm.nih.gov/" target="_blank" rel="noopener">PubChem</a> · <a href="https://www.swissadme.ch/" target="_blank" rel="noopener">SwissADME</a> · <a href="https://tox-new.charite.de/protox3/" target="_blank" rel="noopener">ProTox-3</a></div>
+      <div style="display:flex; gap:12px; align-items:center;">
+        <button id="kbdBtn" style="background:none;border:1px solid var(--panel-line);color:var(--slate);font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;font-family:'IBM Plex Mono',monospace;" data-tip="Keyboard shortcuts (Ctrl+/)">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:4px;"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/></svg>
+          Shortcuts
+        </button>
+        <span style="font-size:10.5px; color:var(--slate);">DDU v2.1.0</span>
+      </div>
+    </div>
+  </footer>
+  <footer style="margin-top: 10px;">Created by <strong style="color: var(--text-dim);">Md Musfiqur Rahaman</strong> &middot; Department of Pharmacy &middot; Daffodil International University &middot; <span style="font-size:10.5px; color:var(--slate);">Build 2026-06-25</span></footer>
+
+  <!-- Comparison Modal -->
+  <div class="modal-overlay" id="compareModal">
+    <div class="modal-card">
+      <button class="modal-close" id="compareClose">&times;</button>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;margin-bottom:18px;">Compound Comparison</div>
+      <div id="compareContent"></div>
+    </div>
+  </div>
+
+  <!-- Statistics Modal -->
+  <div class="modal-overlay" id="statsModal">
+    <div class="modal-card">
+      <button class="modal-close" id="statsClose">&times;</button>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;margin-bottom:18px;">Batch Statistics</div>
+      <div id="statsContent"></div>
+    </div>
+  </div>
+
+  <!-- Export Progress Modal -->
+  <div class="modal-overlay" id="exportModal">
+    <div class="export-progress-card">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;" id="exportTitle">Exporting…</div>
+      <div class="progress-track">
+        <div class="progress-fill" id="exportProgressFill" style="width:0%"></div>
+      </div>
+      <div class="export-progress-label" id="exportProgressLabel">Preparing…</div>
+    </div>
+  </div>
 </div>
 </div>
 
@@ -1836,6 +2292,684 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
   });
 
   updateCount();
+
+  // ═══════════════════════════════════════════════════════════════
+  // TOAST NOTIFICATION SYSTEM
+  // ═══════════════════════════════════════════════════════════════
+  const toastContainer = document.getElementById('toastContainer');
+  function showToast(title, msg, type = 'info', duration = 4000) {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    const icons = {
+      success: '<svg class="toast-icon success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+      error: '<svg class="toast-icon error" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+      info: '<svg class="toast-icon info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
+    };
+    toast.innerHTML = `${icons[type] || icons.info}<div class="toast-body"><div class="toast-title">${escapeHtml(title)}</div>${msg ? '<div class="toast-msg">' + escapeHtml(msg) + '</div>' : ''}</div><button class="toast-close">&times;</button>`;
+    toastContainer.appendChild(toast);
+    toast.querySelector('.toast-close').addEventListener('click', () => removeToast(toast));
+    if (duration > 0) setTimeout(() => removeToast(toast), duration);
+  }
+  function removeToast(toast) {
+    if (!toast.parentElement) return;
+    toast.classList.add('removing');
+    setTimeout(() => { if (toast.parentElement) toast.remove(); }, 200);
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // KEYBOARD SHORTCUTS
+  // ═══════════════════════════════════════════════════════════════
+  const kbdPanel = document.getElementById('kbdPanel');
+  const kbdBtn = document.getElementById('kbdBtn');
+  if (kbdBtn) kbdBtn.addEventListener('click', () => kbdPanel.classList.toggle('open'));
+  kbdPanel.addEventListener('click', (e) => { if (e.target === kbdPanel) kbdPanel.classList.remove('open'); });
+
+  document.addEventListener('keydown', (e) => {
+    // Close panels on Escape
+    if (e.key === 'Escape') {
+      kbdPanel.classList.remove('open');
+      document.getElementById('compareModal')?.classList.remove('open');
+      document.getElementById('statsModal')?.classList.remove('open');
+      document.getElementById('colToggleDropdown')?.classList.remove('open');
+    }
+    // Ctrl+/ → Show shortcuts
+    if (e.key === '/' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault(); kbdPanel.classList.toggle('open');
+    }
+    // Ctrl+Enter → Fetch
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+      // handled by existing listener
+    }
+    // Ctrl+Shift+X → Clear
+    if (e.key === 'X' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+      e.preventDefault(); clearBtn.click();
+    }
+    // Ctrl+Shift+E → Export xlsx
+    if (e.key === 'E' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+      e.preventDefault(); if (!downloadBtn.disabled) downloadBtn.click();
+    }
+    // Ctrl+Shift+S → SDF ZIP
+    if (e.key === 'S' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+      e.preventDefault(); if (!downloadSdfBtn.disabled) downloadSdfBtn.click();
+    }
+    // Ctrl+K → Focus CID input
+    if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault(); cidInput.focus();
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // DRAG & DROP + FILE UPLOAD
+  // ═══════════════════════════════════════════════════════════════
+  const dropToggleBtn = document.getElementById('dropToggleBtn');
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+
+  if (dropToggleBtn) dropToggleBtn.addEventListener('click', () => {
+    dropZone.style.display = dropZone.style.display === 'none' ? '' : 'none';
+  });
+
+  if (dropZone) {
+    ['dragenter','dragover'].forEach(evt => {
+      dropZone.addEventListener(evt, (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    });
+    ['dragleave','drop'].forEach(evt => {
+      dropZone.addEventListener(evt, (e) => { e.preventDefault(); dropZone.classList.remove('drag-over'); });
+    });
+    dropZone.addEventListener('drop', (e) => {
+      const file = e.dataTransfer.files[0];
+      if (file) processUploadedFile(file);
+    });
+  }
+
+  if (fileInput) fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) processUploadedFile(file);
+    fileInput.value = '';
+  });
+
+  function processUploadedFile(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['xlsx','xls','csv'].includes(ext)) {
+      showToast('Invalid file', 'Please upload an .xlsx, .xls, or .csv file.', 'error');
+      return;
+    }
+    showToast('Reading file', `Processing ${file.name}…`, 'info', 3000);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+        const values = [];
+        for (const row of json) {
+          if (row[0] != null && String(row[0]).trim()) values.push(String(row[0]).trim());
+        }
+        if (values.length === 0) {
+          showToast('Empty file', 'No values found in the first column.', 'error');
+          return;
+        }
+        // Check for header row: if first value is text like "CID" or "Name", skip it
+        const firstVal = values[0].toLowerCase();
+        if (['cid','name','compound','id','smiles','s.no','sno','#'].includes(firstVal)) values.shift();
+
+        const trimmed = values.slice(0, MAX_CIDS);
+        cidInput.value = trimmed.join('\n');
+        updateCount();
+        showToast('File loaded', `${trimmed.length} entries loaded from ${file.name}. Click Fetch all to proceed.`, 'success');
+        // Save to recent files
+        saveRecentFile(file.name, trimmed.length);
+      } catch (err) {
+        showToast('Parse error', 'Could not read the file. Make sure it is a valid spreadsheet.', 'error');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // RECENT FILES (localStorage)
+  // ═══════════════════════════════════════════════════════════════
+  function getRecentFiles() {
+    try { return JSON.parse(localStorage.getItem('ddu_recent_files') || '[]'); } catch { return []; }
+  }
+  function saveRecentFile(name, count) {
+    const files = getRecentFiles();
+    files.unshift({ name, count, date: new Date().toISOString() });
+    // Keep only last 10
+    localStorage.setItem('ddu_recent_files', JSON.stringify(files.slice(0, 10)));
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // USER PREFERENCES (localStorage)
+  // ═══════════════════════════════════════════════════════════════
+  function getPref(key, fallback) {
+    try { const v = localStorage.getItem('ddu_pref_' + key); return v !== null ? JSON.parse(v) : fallback; } catch { return fallback; }
+  }
+  function setPref(key, val) {
+    try { localStorage.setItem('ddu_pref_' + key, JSON.stringify(val)); } catch {}
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // TABLE SEARCH, SORT, PAGINATION, COLUMN VISIBILITY
+  // ═══════════════════════════════════════════════════════════════
+  const tableToolbar = document.getElementById('tableToolbar');
+  const tableSearchInput = document.getElementById('tableSearchInput');
+  const paginationEl = document.getElementById('pagination');
+  const paginationInfo = document.getElementById('paginationInfo');
+  const paginationControls = document.getElementById('paginationControls');
+  const emptyState = document.getElementById('emptyState');
+  const colToggleBtn = document.getElementById('colToggleBtn');
+  const colToggleDropdown = document.getElementById('colToggleDropdown');
+  const compareBtn = document.getElementById('compareBtn');
+  const statsBtn = document.getElementById('statsBtn');
+  const compareModal = document.getElementById('compareModal');
+  const statsModal = document.getElementById('statsModal');
+  const exportModal = document.getElementById('exportModal');
+
+  let filteredResults = [];
+  let currentSort = { key: null, dir: 'asc' };
+  let currentPage = 1;
+  const PAGE_SIZE_PREF = getPref('page_size', 20);
+
+  // Column visibility toggle
+  if (colToggleBtn) colToggleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    colToggleDropdown.classList.toggle('open');
+  });
+  document.addEventListener('click', () => colToggleDropdown?.classList.remove('open'));
+
+  if (colToggleDropdown) colToggleDropdown.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const col = cb.dataset.col;
+      const cls = `col-${col}`;
+      document.querySelectorAll(`.${cls}`).forEach(el => {
+        el.style.display = cb.checked ? '' : 'none';
+      });
+      // Save preference
+      const vis = {};
+      colToggleDropdown.querySelectorAll('input').forEach(c => { vis[c.dataset.col] = c.checked; });
+      setPref('col_visibility', vis);
+    });
+  });
+
+  // Load saved column visibility
+  const savedVis = getPref('col_visibility', null);
+  if (savedVis) {
+    colToggleDropdown?.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      const col = cb.dataset.col;
+      if (savedVis[col] === false) {
+        cb.checked = false;
+        document.querySelectorAll(`.col-${col}`).forEach(el => el.style.display = 'none');
+      }
+    });
+  }
+
+  // Sortable column headers
+  document.querySelectorAll('thead th.sortable').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.sort;
+      if (currentSort.key === key) {
+        currentSort.dir = currentSort.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        currentSort = { key, dir: 'asc' };
+      }
+      // Update UI
+      document.querySelectorAll('thead th.sortable').forEach(t => t.classList.remove('sort-asc','sort-desc'));
+      th.classList.add(currentSort.dir === 'asc' ? 'sort-asc' : 'sort-desc');
+      applyFiltersAndRender();
+    });
+  });
+
+  // Table search
+  if (tableSearchInput) tableSearchInput.addEventListener('input', () => {
+    currentPage = 1;
+    applyFiltersAndRender();
+  });
+
+  function applyFiltersAndRender() {
+    const query = (tableSearchInput?.value || '').toLowerCase().trim();
+    let rows = [...lastResults];
+
+    // Filter
+    if (query) {
+      rows = rows.filter(r =>
+        !r.error && (
+          (r.cid && String(r.cid).toLowerCase().includes(query)) ||
+          (r.name && r.name.toLowerCase().includes(query)) ||
+          (r.smiles && r.smiles.toLowerCase().includes(query)) ||
+          (r.formula && r.formula.toLowerCase().includes(query))
+        )
+      );
+    } else {
+      rows = rows.filter(r => !r.error);
+    }
+
+    // Sort
+    if (currentSort.key) {
+      rows.sort((a, b) => {
+        let va = a[currentSort.key] || '';
+        let vb = b[currentSort.key] || '';
+        // Numeric sort for MW and CID
+        if (currentSort.key === 'weight' || currentSort.key === 'cid') {
+          va = parseFloat(va) || 0;
+          vb = parseFloat(vb) || 0;
+        } else {
+          va = String(va).toLowerCase();
+          vb = String(vb).toLowerCase();
+        }
+        if (va < vb) return currentSort.dir === 'asc' ? -1 : 1;
+        if (va > vb) return currentSort.dir === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    filteredResults = rows;
+    renderPaginatedTable();
+  }
+
+  function renderPaginatedTable() {
+    const pageSize = PAGE_SIZE_PREF;
+    const total = filteredResults.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (currentPage > totalPages) currentPage = totalPages;
+
+    const start = (currentPage - 1) * pageSize;
+    const end = Math.min(start + pageSize, total);
+    const pageRows = filteredResults.slice(start, end);
+
+    // Render rows
+    resultsBody.innerHTML = pageRows.map(r => {
+      const imgUrl = `https://pubchem.ncbi.nlm.nih.gov/image/imgsrv.fcgi?cid=${r.cid}&t=l`;
+      return `
+        <tr>
+          <td class="struct-cell col-struct"><div class="mini-struct"><img src="${imgUrl}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='';"></div></td>
+          <td class="cid-cell col-cid">${escapeHtml(r.cid)}</td>
+          <td class="name-cell col-name" title="${escapeHtml(r.name)}"><a href="https://pubchem.ncbi.nlm.nih.gov/#query=${encodeURIComponent(r.name || r.cid)}" target="_blank" rel="noopener">${escapeHtml(r.name)}</a></td>
+          <td class="formula-cell col-formula">${escapeHtml(r.formula)}</td>
+          <td class="formula-cell col-mw">${escapeHtml(r.weight)}</td>
+          <td class="smiles-cell col-smiles" title="${escapeHtml(r.smiles)}">${escapeHtml(r.smiles)}</td>
+          <td class="action-cell col-3d"><button class="sdf-link" data-cid="${escapeHtml(r.cid)}" data-name="${escapeHtml(r.name)}" data-dim="3d">3D</button></td>
+          <td class="action-cell col-2d"><button class="sdf-link" data-cid="${escapeHtml(r.cid)}" data-name="${escapeHtml(r.name)}" data-dim="2d">2D</button></td>
+          <td class="action-cell col-pubchem"><a class="sdf-link pubchem-link-row" href="https://pubchem.ncbi.nlm.nih.gov/compound/${escapeHtml(r.cid)}" target="_blank" rel="noopener" title="Open this compound on PubChem">View ↗</a></td>
+        </tr>`;
+    }).join('');
+
+    // Also render error rows (unfiltered)
+    if (!tableSearchInput?.value?.trim()) {
+      const errRows = lastResults.filter(r => r.error);
+      resultsBody.innerHTML += errRows.map(r => `
+        <tr class="row-error">
+          <td class="struct-cell col-struct"><div class="mini-struct"><span style="font-size:9px;color:#ccc;font-family:'IBM Plex Mono',monospace;">N/A</span></div></td>
+          <td class="cid-cell col-cid">${escapeHtml(r.cid)}</td>
+          <td class="name-cell col-name" colspan="7"><span class="smiles-cell is-error">${escapeHtml(r.error)}</span></td>
+        </tr>`).join('');
+    }
+
+    // Re-bind SDF download buttons
+    resultsBody.querySelectorAll('.sdf-link[data-dim]').forEach(btn => {
+      btn.addEventListener('click', () => downloadSingleSdf(btn.dataset.cid, btn.dataset.name, btn.dataset.dim, btn));
+    });
+
+    // Empty state
+    const isEmpty = filteredResults.length === 0 && lastResults.filter(r => !r.error).length === 0;
+    emptyState.style.display = isEmpty && lastResults.length === 0 ? '' : 'none';
+
+    // Pagination
+    if (total > pageSize) {
+      paginationEl.style.display = '';
+      paginationInfo.textContent = `Showing ${start + 1}–${end} of ${total}`;
+      let btns = '';
+      btns += `<button ${currentPage === 1 ? 'disabled' : ''} data-page="prev">← Prev</button>`;
+      const maxVisible = 5;
+      let startP = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+      let endP = Math.min(totalPages, startP + maxVisible - 1);
+      if (endP - startP < maxVisible - 1) startP = Math.max(1, endP - maxVisible + 1);
+      for (let p = startP; p <= endP; p++) {
+        btns += `<button class="${p === currentPage ? 'active' : ''}" data-page="${p}">${p}</button>`;
+      }
+      btns += `<button ${currentPage === totalPages ? 'disabled' : ''} data-page="next">Next →</button>`;
+      paginationControls.innerHTML = btns;
+      paginationControls.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const p = btn.dataset.page;
+          if (p === 'prev') currentPage = Math.max(1, currentPage - 1);
+          else if (p === 'next') currentPage = Math.min(totalPages, currentPage + 1);
+          else currentPage = parseInt(p);
+          renderPaginatedTable();
+          document.getElementById('pubchemTable').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      });
+    } else {
+      paginationEl.style.display = 'none';
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // DUPLICATE CID DETECTION
+  // ═══════════════════════════════════════════════════════════════
+  function checkDuplicates(entries) {
+    const seen = {};
+    const duplicates = [];
+    entries.forEach(e => {
+      const key = e.toLowerCase().trim();
+      if (seen[key]) duplicates.push(e);
+      else seen[key] = true;
+    });
+    const dupWarning = document.getElementById('dupWarning');
+    const dupWarningText = document.getElementById('dupWarningText');
+    if (duplicates.length > 0) {
+      dupWarning.style.display = 'flex';
+      dupWarningText.textContent = `Duplicate entries detected: ${duplicates.join(', ')}. Only the first occurrence will be used.`;
+    } else {
+      dupWarning.style.display = 'none';
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // COMPARISON TOOL
+  // ═══════════════════════════════════════════════════════════════
+  if (compareBtn) compareBtn.addEventListener('click', () => {
+    const okRows = lastResults.filter(r => !r.error);
+    if (okRows.length < 2) { showToast('Compare', 'Need at least 2 resolved compounds to compare.', 'info'); return; }
+    const content = document.getElementById('compareContent');
+    const props = [
+      ['CID', r => r.cid],
+      ['Name', r => r.name],
+      ['Formula', r => r.formula],
+      ['MW (g/mol)', r => r.weight],
+      ['SMILES', r => r.smiles],
+    ];
+    let html = '<table class="compare-table"><thead><tr><th>Property</th>';
+    okRows.forEach(r => { html += `<th>${escapeHtml(r.name || r.cid)}</th>`; });
+    html += '</tr></thead><tbody>';
+    props.forEach(([label, fn]) => {
+      html += `<tr><td class="prop-label">${label}</td>`;
+      const vals = okRows.map(fn);
+      okRows.forEach((r, i) => {
+        const isDiff = vals.length > 1 && vals.some((v, j) => v !== vals[i]);
+        html += `<td class="${isDiff ? 'diff-val' : ''}">${escapeHtml(vals[i] || '—')}</td>`;
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    content.innerHTML = html;
+    compareModal.classList.add('open');
+  });
+  if (document.getElementById('compareClose')) document.getElementById('compareClose').addEventListener('click', () => compareModal.classList.remove('open'));
+  compareModal?.addEventListener('click', (e) => { if (e.target === compareModal) compareModal.classList.remove('open'); });
+
+  // ═══════════════════════════════════════════════════════════════
+  // BATCH STATISTICS & SUMMARY ANALYSIS
+  // ═══════════════════════════════════════════════════════════════
+  if (statsBtn) statsBtn.addEventListener('click', () => {
+    const okRows = lastResults.filter(r => !r.error);
+    if (okRows.length === 0) { showToast('Statistics', 'No data available.', 'info'); return; }
+    const content = document.getElementById('statsContent');
+
+    // Compute statistics
+    const weights = okRows.map(r => parseFloat(r.weight)).filter(n => !isNaN(n));
+    const mwStats = weights.length > 0 ? {
+      min: Math.min(...weights), max: Math.max(...weights),
+      mean: (weights.reduce((a, b) => a + b, 0) / weights.length).toFixed(2),
+      median: weights.sort((a, b) => a - b)[Math.floor(weights.length / 2)].toFixed(2)
+    } : null;
+
+    let html = '<div class="stats-grid">';
+    html += `<div class="stat-card"><div class="stat-label">Total Compounds</div><div class="stat-value">${okRows.length}</div></div>`;
+    html += `<div class="stat-card"><div class="stat-label">Failed Lookups</div><div class="stat-value" style="color:var(--error)">${lastResults.filter(r => r.error).length}</div></div>`;
+    if (mwStats) {
+      html += `<div class="stat-card"><div class="stat-label">MW Range</div><div class="stat-value" style="font-size:16px;">${mwStats.min.toFixed(1)}–${mwStats.max.toFixed(1)}</div><div class="stat-sub">g/mol</div></div>`;
+      html += `<div class="stat-card"><div class="stat-label">MW Mean</div><div class="stat-value" style="font-size:18px;">${mwStats.mean}</div><div class="stat-sub">g/mol</div></div>`;
+      html += `<div class="stat-card"><div class="stat-label">MW Median</div><div class="stat-value" style="font-size:18px;">${mwStats.median}</div><div class="stat-sub">g/mol</div></div>`;
+    }
+
+    // Drug-likeness MW distribution (Lipinski: MW ≤ 500)
+    if (weights.length > 0) {
+      const lipOk = weights.filter(w => w <= 500).length;
+      const lipFail = weights.length - lipOk;
+      html += `<div class="stat-card"><div class="stat-label">Lipinski MW ≤ 500</div><div class="stat-value" style="font-size:18px;">${lipOk}/${weights.length}</div><div class="stat-sub">${((lipOk/weights.length)*100).toFixed(0)}% pass</div></div>`;
+    }
+
+    // Unique formulas
+    const formulas = [...new Set(okRows.map(r => r.formula).filter(Boolean))];
+    html += `<div class="stat-card"><div class="stat-label">Unique Formulas</div><div class="stat-value">${formulas.length}</div></div>`;
+    html += '</div>';
+
+    // Molecular weight distribution bar
+    if (weights.length > 0) {
+      html += '<div style="margin-top:20px;">';
+      html += '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--slate);margin-bottom:8px;">MW Distribution</div>';
+      const buckets = [
+        ['< 200', weights.filter(w => w < 200).length],
+        ['200–350', weights.filter(w => w >= 200 && w < 350).length],
+        ['350–500', weights.filter(w => w >= 350 && w < 500).length],
+        ['500–800', weights.filter(w => w >= 500 && w < 800).length],
+        ['> 800', weights.filter(w => w >= 800).length],
+      ];
+      const maxB = Math.max(...buckets.map(b => b[1]), 1);
+      html += '<div style="display:flex;flex-direction:column;gap:6px;">';
+      buckets.forEach(([label, count]) => {
+        const pct = (count / weights.length) * 100;
+        html += `<div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);width:60px;text-align:right;">${label}</span>
+          <div style="flex:1;height:16px;background:var(--panel-line);border-radius:3px;overflow:hidden;">
+            <div style="height:100%;width:${pct}%;background:var(--accent);border-radius:3px;transition:width 0.4s ease;min-width:${count > 0 ? '2px' : '0'}"></div>
+          </div>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);width:40px;">${count}</span>
+        </div>`;
+      });
+      html += '</div></div>';
+    }
+
+    // Data completeness
+    const fields = ['cid','name','formula','weight','smiles'];
+    html += '<div style="margin-top:20px;">';
+    html += '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--slate);margin-bottom:10px;">Data Completeness</div>';
+    fields.forEach(f => {
+      const filled = okRows.filter(r => r[f]).length;
+      const pct = (filled / okRows.length) * 100;
+      const cls = pct >= 90 ? 'high' : pct >= 60 ? 'med' : 'low';
+      html += `<div style="margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
+          <span style="color:var(--text-dim);text-transform:capitalize;">${f === 'weight' ? 'MW' : f}</span>
+          <span style="color:var(--slate);">${filled}/${okRows.length}</span>
+        </div>
+        <div class="completeness-bar"><div class="completeness-fill ${cls}" style="width:${pct}%"></div></div>
+      </div>`;
+    });
+    html += '</div>';
+
+    content.innerHTML = html;
+    statsModal.classList.add('open');
+  });
+  if (document.getElementById('statsClose')) document.getElementById('statsClose').addEventListener('click', () => statsModal.classList.remove('open'));
+  statsModal?.addEventListener('click', (e) => { if (e.target === statsModal) statsModal.classList.remove('open'); });
+
+  // ═══════════════════════════════════════════════════════════════
+  // ENHANCED EXPORT WITH PROGRESS
+  // ═══════════════════════════════════════════════════════════════
+  function showExportProgress(title) {
+    document.getElementById('exportTitle').textContent = title;
+    document.getElementById('exportProgressFill').style.width = '0%';
+    document.getElementById('exportProgressLabel').textContent = 'Preparing…';
+    exportModal.classList.add('open');
+  }
+  function updateExportProgress(pct, label) {
+    document.getElementById('exportProgressFill').style.width = pct + '%';
+    if (label) document.getElementById('exportProgressLabel').textContent = label;
+  }
+  function hideExportProgress() {
+    exportModal.classList.remove('open');
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // OVERWRITE renderResults WITH ENHANCED VERSION
+  // ═══════════════════════════════════════════════════════════════
+  const _origRenderResults = renderResults;
+  renderResults = function(results) {
+    lastResults = results;
+    filteredResults = results.filter(r => !r.error);
+    const errCount = results.filter(r => r.error).length;
+    const okCount = results.length - errCount;
+
+    resultsTitle.innerHTML = errCount > 0
+      ? `<b>${okCount}</b> resolved &middot; <span class="err-count">${errCount} failed</span> of ${results.length}`
+      : `<b>${okCount}</b> of ${results.length} resolved`;
+
+    // Show toolbar, enable buttons
+    tableToolbar.style.display = '';
+    compareBtn.disabled = okCount < 2;
+    statsBtn.disabled = okCount === 0;
+    downloadBtn.disabled = okCount === 0;
+    downloadSdfBtn.disabled = okCount === 0;
+
+    // Check duplicates from input
+    checkDuplicates(parseEntries(cidInput.value));
+
+    // Reset and apply filters
+    currentPage = 1;
+    currentSort = { key: null, dir: 'asc' };
+    document.querySelectorAll('thead th.sortable').forEach(t => t.classList.remove('sort-asc','sort-desc'));
+    applyFiltersAndRender();
+
+    resultsWrap.classList.add('active');
+
+    // Show toast for completion
+    if (okCount > 0) showToast('Lookup complete', `${okCount} compound${okCount !== 1 ? 's' : ''} resolved successfully.`, 'success', 3000);
+    if (errCount > 0) showToast('Some lookups failed', `${errCount} entr${errCount !== 1 ? 'ies' : 'y'} could not be resolved.`, 'error', 5000);
+  };
+
+  // Enhanced XLSX export with progress
+  downloadBtn.removeEventListener('click', downloadBtn._handler);
+  downloadBtn._handler = () => {
+    if (!lastResults.length) return;
+    showExportProgress('Generating Spreadsheet…');
+    const rows = lastResults.filter(r => !r.error).map(r => ({
+      'PubChem CID': r.cid, 'Name': r.name, 'SMILES': r.smiles,
+      'Molecular Formula': r.formula, 'Molecular Weight': r.weight
+    }));
+    updateExportProgress(30, 'Building worksheet…');
+    setTimeout(() => {
+      try {
+        const ws = XLSX.utils.json_to_sheet(rows);
+        ws['!cols'] = [{ wch: 12 }, { wch: 30 }, { wch: 50 }, { wch: 16 }, { wch: 16 }];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'PubChem Lookup');
+        updateExportProgress(80, 'Writing file…');
+        const stamp = new Date().toISOString().slice(0, 10);
+        XLSX.writeFile(wb, `pubchem-lookup-${stamp}.xlsx`);
+        updateExportProgress(100, 'Complete!');
+        setTimeout(() => {
+          hideExportProgress();
+          showToast('Export complete', `${rows.length} rows exported to .xlsx`, 'success');
+        }, 600);
+      } catch (err) {
+        hideExportProgress();
+        showToast('Export failed', err.message, 'error');
+      }
+    }, 100);
+  };
+  downloadBtn.addEventListener('click', downloadBtn._handler);
+
+  // Enhanced SDF ZIP with progress
+  const _origDownloadBulkSdf = downloadBulkSdf;
+  downloadBulkSdf = async function() {
+    if (!lastResults.length) return;
+    const okRows = lastResults.filter(r => !r.error);
+    if (okRows.length === 0) return;
+    showExportProgress('Building SDF ZIP…');
+    downloadSdfBtn.disabled = true;
+
+    const zip = new JSZip();
+    const usedNames = {};
+    let count3d = 0, count2d = 0;
+    let unavailable = [];
+
+    for (let i = 0; i < okRows.length; i++) {
+      const r = okRows[i];
+      const pct = Math.round(((i + 1) / okRows.length) * 80);
+      updateExportProgress(pct, `Fetching ${r.name || r.cid} (${i + 1}/${okRows.length})…`);
+
+      let baseName = sanitizeFilename(r.name || ('CID_' + r.cid));
+      let fileName = baseName + '_CID' + r.cid;
+      if (usedNames[fileName]) { usedNames[fileName]++; fileName += '_' + usedNames[fileName]; } else { usedNames[fileName] = 1; }
+
+      try {
+        const { sdf, type } = await fetchSdfWithFallback(r.cid);
+        const record = sdf.trim().endsWith('$$$$') ? sdf : sdf + '\n$$$$\n';
+        zip.file(fileName + (type === '3D' ? '_3D' : '_2D') + '.sdf', record);
+        if (type === '3D') count3d++; else count2d++;
+      } catch (err) { unavailable.push(r.name || r.cid); }
+    }
+
+    if (count3d === 0 && count2d === 0) {
+      hideExportProgress();
+      downloadSdfBtn.disabled = false;
+      showToast('No structures', 'No structure data available for any compound.', 'error');
+      return;
+    }
+
+    updateExportProgress(90, 'Compressing…');
+    const stamp = new Date().toISOString().slice(0, 10);
+    const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'pubchem-structures-' + stamp + '.zip';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    updateExportProgress(100, 'Download complete!');
+    downloadSdfBtn.disabled = false;
+    setTimeout(() => {
+      hideExportProgress();
+      let msg = `${count3d + count2d} SDF file(s)`;
+      if (count3d > 0 && count2d > 0) msg += ` (${count3d} 3D, ${count2d} 2D)`;
+      if (unavailable.length > 0) msg += `. Unavailable: ${unavailable.join(', ')}`;
+      showToast('ZIP downloaded', msg, unavailable.length > 0 ? 'info' : 'success');
+    }, 600);
+  };
+  // Re-bind the click handler
+  downloadSdfBtn.removeEventListener('click', _origDownloadBulkSdf);
+  downloadSdfBtn.addEventListener('click', downloadBulkSdf);
+
+  // Enhanced runBatch with duplicate check and skeleton loading
+  const _origRunBatch = runBatch;
+  runBatch = async function() {
+    const entries = [...new Set(parseEntries(cidInput.value))];
+    if (entries.length === 0) {
+      showToast('No entries', 'Add at least one CID or compound name.', 'error');
+      return;
+    }
+    if (entries.length > MAX_CIDS) {
+      showToast('Too many entries', `Trim to ${MAX_CIDS} or fewer.`, 'error');
+      return;
+    }
+    checkDuplicates(parseEntries(cidInput.value));
+    // Show skeleton loading
+    resultsBody.innerHTML = Array.from({length: Math.min(entries.length, 5)}, () =>
+      `<div class="skeleton-row">
+        <div class="skel sq42"></div>
+        <div class="skel w60"></div>
+        <div class="skel w120"></div>
+        <div class="skel w80"></div>
+        <div class="skel w60"></div>
+        <div class="skel w200"></div>
+        <div class="skel w40"></div>
+        <div class="skel w40"></div>
+        <div class="skel w60"></div>
+      </div>`
+    ).join('');
+    emptyState.style.display = 'none';
+    resultsWrap.classList.add('active');
+    tableToolbar.style.display = 'none';
+
+    await _origRunBatch();
+  };
+  fetchBtn.removeEventListener('click', _origRunBatch);
+  fetchBtn.addEventListener('click', runBatch);
+
 </script>
 
 <script>
@@ -1871,6 +3005,8 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
 
   function admetReadForm() {
     const data = { compound: admetCompoundIdInput.value.trim() };
+    const smilesEl = document.getElementById('admetSmilesInput');
+    if (smilesEl) data.smiles = smilesEl.value.trim();
     ADMET_FIELD_IDS.forEach(id => {
       data[id] = document.getElementById(id).value.trim();
     });
@@ -1879,6 +3015,11 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
 
   function admetFillForm(data) {
     admetCompoundIdInput.value = data.compound || '';
+    const smilesEl = document.getElementById('admetSmilesInput');
+    if (smilesEl && data.smiles) {
+      smilesEl.value = data.smiles;
+      smilesEl.dataset.autoFilledByCid = 'true';
+    }
     ADMET_FIELD_IDS.forEach(id => {
       document.getElementById(id).value = data[id] || '';
     });
@@ -1994,6 +3135,7 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
         <td class="name-cell" title="${admetEscapeHtml(c.compound)}">${admetEscapeHtml(c.compound)}</td>
         <td class="formula-cell">${admetEscapeHtml(c.admet_mw) || '—'}</td>
         <td class="formula-cell">${admetEscapeHtml(c.admet_logp) || '—'}</td>
+        <td class="smiles-cell" title="${admetEscapeHtml(c.smiles || '')}" style="max-width:140px;font-size:11px;">${admetEscapeHtml(c.smiles) || '—'}</td>
         <td class="formula-cell">${admetEscapeHtml(c.admet_gi) || '—'}</td>
         <td class="formula-cell">${admetEscapeHtml(c.admet_ld50) || '—'}</td>
         <td style="display:flex; gap:6px;">
@@ -2689,8 +3831,10 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
     async function cidToSmiles(cid) {
       const trimmed = String(cid).trim();
 
-      // Primary: request all SMILES properties at once
-      const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${encodeURIComponent(trimmed)}/property/IsomericSMILES,CanonicalSMILES/JSON`;
+      // Primary: request SMILES properties — PubChem PUG REST returns them
+      // as "SMILES" (Isomeric) and "ConnectivitySMILES" in the JSON response,
+      // regardless of the property names used in the request URL.
+      const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${encodeURIComponent(trimmed)}/property/SMILES,IsomericSMILES,CanonicalSMILES,ConnectivitySMILES/JSON`;
       let res = await fetch(url);
 
       // Fallback: if primary fails, try the compound JSON endpoint
@@ -2700,9 +3844,9 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         // Extract from full compound JSON
-        const props = data?.PC_Compounds?.[0]?.props;
-        if (props) {
-          const smilesEntry = props.find(p =>
+        const fbProps = data?.PC_Compounds?.[0]?.props;
+        if (fbProps) {
+          const smilesEntry = fbProps.find(p =>
             p?.urn?.label === 'SMILES' || p?.urn?.name === 'Isomeric' || p?.urn?.name === 'Canonical'
           );
           const smiles = smilesEntry?.value?.sval;
@@ -2713,7 +3857,10 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
 
       const data = await res.json();
       const props = data?.PropertyTable?.Properties?.[0];
-      const smiles = props?.IsomericSMILES || props?.CanonicalSMILES;
+      // PubChem API returns "SMILES" and "ConnectivitySMILES" keys in JSON;
+      // "IsomericSMILES" / "CanonicalSMILES" may also appear for some compounds.
+      // Check all possible keys in order of preference.
+      const smiles = props?.SMILES || props?.IsomericSMILES || props?.CanonicalSMILES || props?.ConnectivitySMILES;
       if (!smiles) throw new Error('No SMILES in response');
       return { smiles, cid: trimmed };
     }
@@ -2956,8 +4103,246 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
     }
   });
 
+  // ═══════════════════════════════════════════════════════════════
+  // ADMET DATA VALIDATION & SUMMARY STATISTICS
+  // ═══════════════════════════════════════════════════════════════
+  function admetValidateCompound(c) {
+    const issues = [];
+    if (!c.compound) issues.push('No compound identifier');
+    const mw = parseFloat(c.admet_mw);
+    if (c.admet_mw && isNaN(mw)) issues.push('Invalid MW value');
+    if (mw && (mw < 50 || mw > 2000)) issues.push('MW out of typical range (50–2000)');
+    const logp = parseFloat(c.admet_logp);
+    if (logp && (logp < -10 || logp > 10)) issues.push('LogP out of typical range');
+    const ld50 = parseFloat(c.admet_ld50);
+    if (c.admet_ld50 && isNaN(ld50)) issues.push('Invalid LD50 value');
+    return issues;
+  }
+
+  function admetCompleteness(c) {
+    const allFields = ['compound', 'smiles', ...ADMET_FIELD_IDS];
+    let filled = 0;
+    allFields.forEach(f => {
+      if (c[f] && String(c[f]).trim()) filled++;
+    });
+    return filled / allFields.length;
+  }
+
+  // Patch admetRenderList to include validation badges and summary
+  const _origAdmetRenderList = admetRenderList;
+  admetRenderList = function() {
+    _origAdmetRenderList();
+
+    // Add validation badges to each row
+    admetListBody.querySelectorAll('tr').forEach((tr, i) => {
+      if (i >= admetCompounds.length) return;
+      const c = admetCompounds[i];
+      const issues = admetValidateCompound(c);
+      const completeness = admetCompleteness(c);
+      const badge = document.createElement('span');
+      if (issues.length > 0) {
+        badge.className = 'val-badge bad';
+        badge.textContent = `${issues.length} issue${issues.length > 1 ? 's' : ''}`;
+        badge.title = issues.join('\n');
+      } else if (completeness >= 0.8) {
+        badge.className = 'val-badge ok';
+        badge.textContent = 'Complete';
+      } else if (completeness >= 0.5) {
+        badge.className = 'val-badge warn';
+        badge.textContent = `${Math.round(completeness * 100)}%`;
+      } else {
+        badge.className = 'val-badge bad';
+        badge.textContent = `${Math.round(completeness * 100)}%`;
+      }
+      const lastTd = tr.querySelector('td:last-child');
+      if (lastTd) lastTd.prepend(badge);
+    });
+
+    // Show/hide ADMET summary section
+    updateAdmetSummary();
+
+    // Update tab badge
+    const badge = document.getElementById('admetTabBadge');
+    if (badge) {
+      if (admetCompounds.length > 0) {
+        badge.textContent = admetCompounds.length;
+        badge.style.display = '';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+  };
+
+  function updateAdmetSummary() {
+    let summaryEl = document.getElementById('admetSummarySection');
+    if (!summaryEl) {
+      summaryEl = document.createElement('div');
+      summaryEl.id = 'admetSummarySection';
+      summaryEl.className = 'summary-section';
+      summaryEl.style.display = 'none';
+      document.getElementById('admetListWrap')?.appendChild(summaryEl);
+    }
+
+    if (admetCompounds.length < 2) {
+      summaryEl.style.display = 'none';
+      return;
+    }
+
+    summaryEl.style.display = '';
+
+    let html = '<div class="summary-title">Dataset Summary & Validation</div>';
+    html += '<div class="stats-grid">';
+
+    // Total compounds
+    html += `<div class="stat-card"><div class="stat-label">Total Compounds</div><div class="stat-value">${admetCompounds.length}</div></div>`;
+
+    // Average completeness
+    const avgCompleteness = admetCompounds.reduce((sum, c) => sum + admetCompleteness(c), 0) / admetCompounds.length;
+    html += `<div class="stat-card"><div class="stat-label">Avg. Data Completeness</div><div class="stat-value" style="font-size:18px;">${Math.round(avgCompleteness * 100)}%</div></div>`;
+
+    // MW stats
+    const weights = admetCompounds.map(c => parseFloat(c.admet_mw)).filter(n => !isNaN(n));
+    if (weights.length > 0) {
+      const mean = (weights.reduce((a, b) => a + b, 0) / weights.length).toFixed(1);
+      html += `<div class="stat-card"><div class="stat-label">MW Range</div><div class="stat-value" style="font-size:16px;">${Math.min(...weights).toFixed(0)}–${Math.max(...weights).toFixed(0)}</div><div class="stat-sub">Mean: ${mean} g/mol</div></div>`;
+    }
+
+    // Drug-likeness summary
+    const lipYes = admetCompounds.filter(c => c.admet_lipinski === 'Yes').length;
+    const lipNo = admetCompounds.filter(c => c.admet_lipinski === 'No').length;
+    const lipNa = admetCompounds.length - lipYes - lipNo;
+    if (lipYes + lipNo > 0) {
+      html += `<div class="stat-card"><div class="stat-label">Lipinski Compliance</div><div class="stat-value" style="font-size:18px;">${lipYes}/${lipYes + lipNo}</div><div class="stat-sub">${((lipYes / (lipYes + lipNo)) * 100).toFixed(0)}% pass</div></div>`;
+    }
+
+    // Validation issues
+    const totalIssues = admetCompounds.reduce((sum, c) => sum + admetValidateCompound(c).length, 0);
+    if (totalIssues > 0) {
+      html += `<div class="stat-card"><div class="stat-label">Validation Issues</div><div class="stat-value" style="color:var(--amber);font-size:18px;">${totalIssues}</div><div class="stat-sub">across dataset</div></div>`;
+    }
+
+    html += '</div>';
+
+    // Drug-likeness distribution bars
+    const drugFilters = [
+      ['Lipinski', 'admet_lipinski'],
+      ['Ghose', 'admet_ghose'],
+      ['Veber', 'admet_veber'],
+      ['Egan', 'admet_egan'],
+      ['Muegge', 'admet_muegge'],
+    ];
+    html += '<div style="margin-top:20px;">';
+    html += '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--slate);margin-bottom:12px;">Drug-likeness Distribution</div>';
+    drugFilters.forEach(([label, id]) => {
+      const yes = admetCompounds.filter(c => c[id] === 'Yes').length;
+      const no = admetCompounds.filter(c => c[id] === 'No').length;
+      const na = admetCompounds.length - yes - no;
+      if (yes + no === 0) return;
+      const yPct = (yes / admetCompounds.length * 100);
+      const nPct = (no / admetCompounds.length * 100);
+      const naPct = (na / admetCompounds.length * 100);
+      html += `<div style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
+          <span style="color:var(--text-dim);">${label}</span>
+          <span style="color:var(--slate);">${yes} Yes · ${no} No${na > 0 ? ' · ' + na + ' N/A' : ''}</span>
+        </div>
+        <div class="distribution-bar">
+          <div class="seg yes" style="width:${yPct}%"></div>
+          <div class="seg no" style="width:${nPct}%"></div>
+          ${na > 0 ? '<div class="seg na" style="width:' + naPct + '%"></div>' : ''}
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+
+    // Toxicity summary
+    const toxEndpoints = [
+      ['Hepatotoxicity', 'admet_hepato'],
+      ['Carcinogenicity', 'admet_carcino'],
+      ['Immunotoxicity', 'admet_immuno'],
+      ['Mutagenicity', 'admet_mutagen'],
+      ['Cytotoxicity', 'admet_cyto'],
+    ];
+    const hasToxData = admetCompounds.some(c => toxEndpoints.some(([, id]) => c[id]));
+    if (hasToxData) {
+      html += '<div style="margin-top:20px;">';
+      html += '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--slate);margin-bottom:12px;">Toxicity Profile</div>';
+      toxEndpoints.forEach(([label, id]) => {
+        const active = admetCompounds.filter(c => c[id] === 'Active').length;
+        const inactive = admetCompounds.filter(c => c[id] === 'Inactive').length;
+        if (active + inactive === 0) return;
+        const aPct = (active / admetCompounds.length * 100);
+        const iPct = (inactive / admetCompounds.length * 100);
+        html += `<div style="margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
+            <span style="color:var(--text-dim);">${label}</span>
+            <span style="color:var(--slate);">${active} Active · ${inactive} Inactive</span>
+          </div>
+          <div class="distribution-bar">
+            <div class="seg no" style="width:${aPct}%"></div>
+            <div class="seg yes" style="width:${iPct}%"></div>
+          </div>
+        </div>`;
+      });
+      html += '</div>';
+    }
+
+    summaryEl.innerHTML = html;
+  }
+
+  // Replace confirm() with modern dialog for history delete
+  const _origAdmetHistoryDelete = admetHistoryDelete;
+  admetHistoryDelete = async function(id) {
+    showToast('Delete session', 'Click again within 3 seconds to confirm deletion.', 'info', 3000);
+    const btn = document.querySelector(`.history-del-btn[data-id="${id}"]`);
+    if (!btn) return;
+    const origText = btn.textContent;
+    btn.textContent = 'Confirm?';
+    btn.style.background = 'rgba(232,101,74,0.2)';
+    const handler = async () => {
+      const { error } = await supabaseClient.from(HISTORY_TABLE).delete().eq('id', id).eq('user_id', currentUser.id);
+      if (error) { historyShowMsg('Delete failed: ' + error.message, true); return; }
+      historyShowMsg('Session deleted.', false);
+      admetHistoryLoad();
+    };
+    const clickOnce = async () => { handler(); btn.removeEventListener('click', clickOnce); };
+    btn.addEventListener('click', clickOnce, { once: true });
+    setTimeout(() => {
+      btn.textContent = origText;
+      btn.style.background = '';
+      btn.removeEventListener('click', clickOnce);
+    }, 3000);
+  };
+  // Re-bind delete buttons
+  document.querySelectorAll('.history-del-btn').forEach(btn => {
+    btn.replaceWith(btn.cloneNode(true));
+  });
+
+  // Replace password recovery alert() with toast
+  const _origHandlePasswordRecovery = handlePasswordRecovery;
+  handlePasswordRecovery = async function() {
+    // Show inline dialog instead of prompt()
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay open';
+    overlay.innerHTML = `<div class="modal-card" style="max-width:400px;padding:24px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;margin-bottom:14px;">Reset Password</div>
+      <div class="auth-field"><label>New Password</label><input type="password" id="newPwInput" placeholder="Min 6 characters" autocomplete="new-password"></div>
+      <button id="newPwSubmit" style="width:100%;background:var(--accent);color:#0A1721;border:none;border-radius:6px;padding:11px;font-weight:600;cursor:pointer;margin-top:6px;">Update password</button>
+    </div>`;
+    document.body.appendChild(overlay);
+    document.getElementById('newPwInput').focus();
+    document.getElementById('newPwSubmit').addEventListener('click', async () => {
+      const pw = document.getElementById('newPwInput').value;
+      if (!pw || pw.length < 6) { showToast('Invalid', 'Password must be at least 6 characters.', 'error'); return; }
+      const { error } = await supabaseClient.auth.updateUser({ password: pw });
+      overlay.remove();
+      if (error) showToast('Error', error.message, 'error');
+      else showToast('Success', 'Password updated. You are now signed in.', 'success');
+    });
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  };
 
 </script>
 
-</body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a10f5a4b2f94a443',t:'MTc4MjM0MjA2OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
