@@ -2035,8 +2035,8 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
       return new TableCell({
         borders, width: { size: width, type: WIDTH_DXA }, shading: headerShade,
         verticalAlign: VALIGN_CENTER,
-        margins: { top: 60, bottom: 60, left: 60, right: 60 },
-        children: [cellText(text, { bold: true, color: "FFFFFF", size: 17 })]
+        margins: { top: 50, bottom: 50, left: 50, right: 50 },
+        children: [cellText(text, { bold: true, color: "FFFFFF", size: 16 })]
       });
     }
 
@@ -2044,8 +2044,8 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
       return new TableCell({
         borders, width: { size: width, type: WIDTH_DXA }, shading: labelShade,
         verticalAlign: VALIGN_CENTER,
-        margins: { top: 50, bottom: 50, left: 70, right: 50 },
-        children: [cellText(text, { bold: true, align: ALIGN_LEFT, size: 17 })]
+        margins: { top: 40, bottom: 40, left: 60, right: 40 },
+        children: [cellText(text, { bold: true, align: ALIGN_LEFT, size: 16 })]
       });
     }
 
@@ -2053,8 +2053,8 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
       return new TableCell({
         borders, width: { size: width, type: WIDTH_DXA },
         verticalAlign: VALIGN_CENTER,
-        margins: { top: 50, bottom: 50, left: 50, right: 50 },
-        children: [cellText(text || '—', { size: 17, color: text ? "1A1A1A" : "9AA5AC" })]
+        margins: { top: 40, bottom: 40, left: 40, right: 40 },
+        children: [cellText(text || '—', { size: 16, color: text ? "1A1A1A" : "9AA5AC" })]
       });
     }
 
@@ -2104,9 +2104,10 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
     }
 
     // Landscape US Letter: page width 15840, margins 720 each side → content 14400 DXA
+    // (docx.js requires short edge as width, long as height — it swaps internally for landscape)
     const CONTENT_WIDTH = 14400;
-    const LABEL_COL_W = 1600;
-    const ATTR_COL_W = 1900;
+    const LABEL_COL_W = 1400;
+    const ATTR_COL_W = 1600;
 
     function buildTableAPage(pageCompounds, startIndex) {
       const n = pageCompounds.length;
@@ -2258,7 +2259,7 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
       sections: [{
         properties: {
           page: {
-            size: { width: 15840, height: 12240, orientation: "landscape" },
+            size: { width: 12240, height: 15840, orientation: "landscape" },
             margin: { top: 720, right: 720, bottom: 720, left: 720 }
           }
         },
