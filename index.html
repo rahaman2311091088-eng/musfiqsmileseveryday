@@ -572,7 +572,7 @@
       <div style="display:flex; gap:10px; flex-wrap:wrap;">
         <button id="downloadSdfBtn" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path></svg>
-          Download 3D SDF (all)
+          Download SDF (3D, or 2D if unavailable)
         </button>
         <button id="downloadBtn" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
@@ -590,7 +590,7 @@
             <th>Formula</th>
             <th>MW</th>
             <th>SMILES</th>
-            <th>3D SDF</th>
+            <th>SDF</th>
           </tr>
         </thead>
         <tbody id="resultsBody"></tbody>
@@ -828,21 +828,41 @@
     return text;
   }
 
+  async function fetchSdf2d(cid) {
+    const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/record/SDF?record_type=2d`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('no-2d');
+    const text = await res.text();
+    if (!text || text.trim().length === 0) throw new Error('empty');
+    return text;
+  }
+
+  // Tries 3D first; falls back to 2D if no conformer model exists. Returns { sdf, type }.
+  async function fetchSdfWithFallback(cid) {
+    try {
+      const sdf = await fetchSdf3d(cid);
+      return { sdf, type: '3D' };
+    } catch (err) {
+      const sdf = await fetchSdf2d(cid);
+      return { sdf, type: '2D' };
+    }
+  }
+
   async function downloadSingleSdf(cid, name, btnEl) {
     const originalLabel = btnEl.textContent;
     btnEl.disabled = true;
     btnEl.textContent = '…';
     btnEl.classList.add('loading');
     try {
-      const sdf = await fetchSdf3d(cid);
-      triggerDownload(`${sanitizeFilename(name)}_CID${cid}_3D.sdf`, sdf);
-      btnEl.textContent = '✓';
+      const { sdf, type } = await fetchSdfWithFallback(cid);
+      triggerDownload(`${sanitizeFilename(name)}_CID${cid}_${type}.sdf`, sdf);
+      btnEl.textContent = type === '3D' ? '✓ 3D' : '✓ 2D';
     } catch (err) {
-      btnEl.textContent = 'No 3D';
+      btnEl.textContent = 'Unavailable';
       setTimeout(() => { btnEl.textContent = originalLabel; }, 1800);
     } finally {
       btnEl.classList.remove('loading');
-      setTimeout(() => { btnEl.disabled = false; if (btnEl.textContent === '✓') btnEl.textContent = originalLabel; }, 1800);
+      setTimeout(() => { btnEl.disabled = false; if (btnEl.textContent.startsWith('✓')) btnEl.textContent = originalLabel; }, 1800);
     }
   }
 
@@ -853,33 +873,48 @@
 
     downloadSdfBtn.disabled = true;
     const originalLabel = downloadSdfBtn.innerHTML;
-    let collected = [];
-    let missing = [];
+    let collected3d = [];
+    let collected2d = [];
+    let unavailable = [];
 
     for (let i = 0; i < okRows.length; i++) {
       const r = okRows[i];
-      downloadSdfBtn.textContent = `Fetching 3D… ${i + 1}/${okRows.length}`;
+      downloadSdfBtn.textContent = `Fetching structures… ${i + 1}/${okRows.length}`;
       try {
-        const sdf = await fetchSdf3d(r.cid);
-        collected.push(sdf.trim().endsWith('$$$$') ? sdf : sdf + '\n$$$$\n');
+        const { sdf, type } = await fetchSdfWithFallback(r.cid);
+        const record = sdf.trim().endsWith('$$$$') ? sdf : sdf + '\n$$$$\n';
+        if (type === '3D') collected3d.push(record);
+        else collected2d.push(record);
       } catch (err) {
-        missing.push(r.name || r.cid);
+        unavailable.push(r.name || r.cid);
       }
     }
 
     downloadSdfBtn.innerHTML = originalLabel;
     downloadSdfBtn.disabled = false;
 
-    if (collected.length === 0) {
-      showState('No 3D conformer data was available for any compound in this set.', true);
+    const stamp = new Date().toISOString().slice(0, 10);
+    let downloadedAny = false;
+
+    if (collected3d.length > 0) {
+      triggerDownload(`pubchem-3d-conformers-${stamp}.sdf`, collected3d.join('\n'));
+      downloadedAny = true;
+    }
+    if (collected2d.length > 0) {
+      triggerDownload(`pubchem-2d-structures-${stamp}.sdf`, collected2d.join('\n'));
+      downloadedAny = true;
+    }
+
+    if (!downloadedAny) {
+      showState('No structure data was available for any compound in this set.', true);
       return;
     }
 
-    triggerDownload(`pubchem-3d-conformers-${new Date().toISOString().slice(0, 10)}.sdf`, collected.join('\n'));
-
-    if (missing.length > 0) {
-      showState(`Downloaded ${collected.length} of ${okRows.length} 3D structures. No 3D model available for: ${missing.join(', ')}.`, false);
-    }
+    let msg = `Downloaded ${collected3d.length} 3D structure(s)`;
+    if (collected2d.length > 0) msg += ` and ${collected2d.length} 2D structure(s) (no 3D model available for those)`;
+    if (unavailable.length > 0) msg += `. No structure at all for: ${unavailable.join(', ')}`;
+    msg += '.';
+    showState(msg, unavailable.length > 0 && collected3d.length === 0 && collected2d.length === 0);
   }
 
   downloadSdfBtn.addEventListener('click', downloadBulkSdf);
