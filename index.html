@@ -269,6 +269,10 @@
   .sdf-link:hover { border-color: var(--accent-dim); color: var(--accent); }
   .sdf-link:disabled { opacity: 0.4; cursor: not-allowed; }
   .sdf-link.loading { color: var(--amber); }
+  a.sdf-link {
+    display: inline-block;
+    text-decoration: none;
+  }
 
   .table-card {
     background: var(--bg-raised);
@@ -592,6 +596,7 @@
             <th>SMILES</th>
             <th>3D</th>
             <th>2D</th>
+            <th>PubChem</th>
           </tr>
         </thead>
         <tbody id="resultsBody"></tbody>
@@ -1098,7 +1103,7 @@
           <tr class="row-error">
             <td class="struct-cell"><div class="mini-struct"><span style="font-size:9px;color:#ccc;font-family:'IBM Plex Mono',monospace;">N/A</span></div></td>
             <td class="cid-cell">${escapeHtml(r.cid)}</td>
-            <td class="name-cell" colspan="6"><span class="smiles-cell is-error">${escapeHtml(r.error)}</span></td>
+            <td class="name-cell" colspan="7"><span class="smiles-cell is-error">${escapeHtml(r.error)}</span></td>
           </tr>`;
       }
       const imgUrl = `https://pubchem.ncbi.nlm.nih.gov/image/imgsrv.fcgi?cid=${r.cid}&t=l`;
@@ -1116,6 +1121,7 @@
           <td class="smiles-cell" title="${escapeHtml(r.smiles)}">${escapeHtml(r.smiles)}</td>
           <td><button class="sdf-link" data-cid="${escapeHtml(r.cid)}" data-name="${escapeHtml(r.name)}" data-dim="3d">3D</button></td>
           <td><button class="sdf-link" data-cid="${escapeHtml(r.cid)}" data-name="${escapeHtml(r.name)}" data-dim="2d">2D</button></td>
+          <td><a class="sdf-link pubchem-link-row" href="https://pubchem.ncbi.nlm.nih.gov/compound/${escapeHtml(r.cid)}" target="_blank" rel="noopener" title="Open this compound on PubChem">View ↗</a></td>
         </tr>`;
     }).join('');
 
