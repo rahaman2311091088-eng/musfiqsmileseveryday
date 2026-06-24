@@ -1063,7 +1063,7 @@
       <div class="auth-msg" id="admetFormMsg"></div>
     </div>
 
-    <div class="results-wrap" id="admetListWrap" style="margin-top:28px;">
+    <div class="results-wrap active" id="admetListWrap" style="margin-top:28px;">
       <div class="results-header">
         <div class="results-title" id="admetListTitle">0 compounds added</div>
         <div class="dl-btn-group">
@@ -1760,10 +1760,28 @@
 
   function admetClearForm() {
     admetCompoundIdInput.value = '';
-    ADMET_FIELD_IDS.forEach(id => { document.getElementById(id).value = ''; });
+    const smilesEl = document.getElementById('admetSmilesInput');
+    if (smilesEl) smilesEl.value = '';
+    const statusEl = document.getElementById('smilesToCidStatus');
+    if (statusEl) { statusEl.textContent = ''; statusEl.style.display = 'none'; }
+    const infoEl = document.getElementById('smilesToCidInfo');
+    if (infoEl) { infoEl.textContent = ''; infoEl.style.display = 'none'; }
+    ADMET_FIELD_IDS.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (el.tagName === 'SELECT') el.value = '';
+      else el.value = '';
+    });
     admetEditIndex = null;
     admetAddBtn.textContent = 'Add compound';
     admetFormMsg.classList.remove('show');
+    // Clear paste clipboards too
+    const swissEl = document.getElementById('swissadmePaste');
+    const protoxEl = document.getElementById('protoxPaste');
+    if (swissEl) swissEl.value = '';
+    if (protoxEl) protoxEl.value = '';
+    const parseMsg = document.getElementById('parseResultMsg');
+    if (parseMsg) parseMsg.classList.remove('show', 'error');
   }
 
   function admetShowMsg(text, isError) {
@@ -2281,39 +2299,45 @@
     }
 
     // Also fill SMILES from ProTox output (Name field contains SMILES)
+    // Only fill physicochemical fields if they are currently empty — don't overwrite SwissADME data
+    function fillIfEmpty(id, val) {
+      const el = document.getElementById(id);
+      if (el && !el.value.trim()) { el.value = val; filled++; }
+    }
+
     const smiles = grab(/^(?:Name|SMILES)\s+([\S]+)/m);
     if (smiles && smiles.includes('=')) {
       const smilesEl = document.getElementById('admetSmilesInput');
       if (smilesEl && !smilesEl.value) { smilesEl.value = smiles; filled++; }
     }
 
-    // Molecular weight from ProTox output
+    // Molecular weight — only if SwissADME hasn't filled it yet
     const mw = grab(/Molweight\s+([\d.]+)/i);
-    if (mw) { document.getElementById('admet_mw').value = mw; filled++; }
+    if (mw) fillIfEmpty('admet_mw', mw);
 
-    // Heavy atoms from ProTox output ("Number of atoms")
+    // Heavy atoms — only if empty
     const atoms = grab(/Number of atoms\s+(\d+)/i);
-    if (atoms) { document.getElementById('admet_heavyAtoms').value = atoms; filled++; }
+    if (atoms) fillIfEmpty('admet_heavyAtoms', atoms);
 
-    // Rotatable bonds from ProTox output
+    // Rotatable bonds — only if empty
     const rot = grab(/Number of rotable bonds\s+(\d+)/i);
-    if (rot) { document.getElementById('admet_rotBonds').value = rot; filled++; }
+    if (rot) fillIfEmpty('admet_rotBonds', rot);
 
-    // H-bond acceptors from ProTox output
+    // H-bond acceptors — only if empty
     const hAcc = grab(/Number of hydrogen bond acceptors\s+(\d+)/i);
-    if (hAcc) { document.getElementById('admet_hAcceptors').value = hAcc; filled++; }
+    if (hAcc) fillIfEmpty('admet_hAcceptors', hAcc);
 
-    // H-bond donors from ProTox output
+    // H-bond donors — only if empty
     const hDon = grab(/Number of hydrogen bond donors\s+(\d+)/i);
-    if (hDon) { document.getElementById('admet_hDonors').value = hDon; filled++; }
+    if (hDon) fillIfEmpty('admet_hDonors', hDon);
 
-    // Molar refractivity from ProTox output
+    // Molar refractivity — only if empty
     const mr = grab(/Molecular refractivity\s+([\d.]+)/i);
-    if (mr) { document.getElementById('admet_molarRef').value = mr; filled++; }
+    if (mr) fillIfEmpty('admet_molarRef', mr);
 
-    // LogP from ProTox output
+    // LogP — only if empty
     const logp = grab(/octanol\/water partition coefficient\s*\(logP\)\s*([\d.+-]+)/i);
-    if (logp) { document.getElementById('admet_logp').value = logp; filled++; }
+    if (logp) fillIfEmpty('admet_logp', logp);
 
     return filled;
   }
