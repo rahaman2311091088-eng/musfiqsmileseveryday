@@ -730,6 +730,8 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
   }
   button#admetGenerateBtn:hover { background: #F2B25C; }
   button#admetGenerateBtn:disabled { background: var(--panel-line); color: var(--slate); cursor: not-allowed; }
+  button#admetGenerateBtnTop:not(:disabled):hover { background: #F2B25C; }
+  button#admetGenerateBtnTop:not(:disabled):active { transform: scale(0.97); }
   button#admetGenerateBtn svg { width: 16px; height: 16px; }
 
   .admet-row-remove {
@@ -940,7 +942,6 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
   </div>
 
   <div id="pubchemTab" class="main-panel active">
-  <div class="eyebrow">Live · PubChem PUG REST</div>
   <h1>Drug Design <span>Universe</span></h1>
   <p class="sub">Paste up to 50 PubChem Compound IDs or compound names — one per line, or comma-separated for simple names. Chemical names containing commas (e.g. <em>12-Oxododecanoic acid, ethyl ester</em>) are automatically detected and kept as a single entry.</p>
 
@@ -1007,6 +1008,15 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
     <h1>ADMET <span>Profiling</span></h1>
     <p class="sub">Enter ADME and toxicity data for each compound manually — retrieve values from <strong style="color:var(--accent)">SwissADME</strong> (swissadme.ch) and <strong style="color:var(--accent)">ProTox-3</strong> (tox-new.charite.de). Add at least <strong style="color:var(--amber)">5 compounds</strong> to generate the Word report.</p>
 
+    <!-- Generate Word report button at top -->
+    <div style="margin-bottom:18px;">
+      <button id="admetGenerateBtnTop" disabled style="display:inline-flex; align-items:center; gap:8px; background:var(--amber); color:#0A1721; font-weight:700; font-size:14px; padding:11px 22px; border-radius:8px; border:none; cursor:pointer; opacity:0.5;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        Generate Word report (.docx)
+      </button>
+      <span id="admetTopBtnStatus" style="margin-left:12px; font-size:12.5px; color:var(--slate);"></span>
+    </div>
+
     <div class="console" id="admetFormCard">
       <div class="console-label-row">
         <div class="console-label">Add a compound</div>
@@ -1039,13 +1049,17 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
       <div class="admet-field-row">
         <div class="admet-field admet-field-wide">
           <label>Compound (CID or Name)</label>
-          <input type="text" id="admetCompoundId" placeholder="e.g. 2244 or Aspirin">
+          <div style="position:relative;">
+            <input type="text" id="admetCompoundId" placeholder="e.g. 2244 or Aspirin" style="width:100%; padding-right:140px;">
+            <span id="cidToSmilesStatus" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--text-dim); pointer-events:none; display:none;"></span>
+          </div>
+          <div id="cidToSmilesInfo" style="font-size:11.5px; margin-top:5px; color:var(--accent-dim); display:none;"></div>
         </div>
       </div>
 
       <div class="admet-field-row" style="margin-bottom:4px;">
         <div class="admet-field admet-field-wide">
-          <label>SMILES (optional reference)</label>
+          <label>SMILES <span style="font-size:11px; color:var(--slate); font-weight:400;">(auto-filled from CID · or enter manually)</span></label>
           <div style="position:relative;">
             <input type="text" id="admetSmilesInput" placeholder="e.g. CC(=O)Oc1ccccc1C(=O)O" style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--amber); width:100%; padding-right:150px;">
             <span id="smilesToCidStatus" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--text-dim); pointer-events:none; display:none;"></span>
@@ -1910,11 +1924,28 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
       return;
     }
     if (admetEditIndex !== null) {
+      // Allow saving same CID for same index (editing in place)
+      const dupIdx = admetCompounds.findIndex((c, i) =>
+        i !== admetEditIndex &&
+        c.compound.trim().toLowerCase() === data.compound.trim().toLowerCase()
+      );
+      if (dupIdx !== -1) {
+        admetShowMsg(`Duplicate: "${data.compound}" is already listed as compound #${dupIdx + 1}.`, true);
+        return;
+      }
       admetCompounds[admetEditIndex] = data;
       admetShowMsg(`Updated compound #${admetEditIndex + 1}.`, false);
     } else {
       if (admetCompounds.length >= 60) {
         admetShowMsg('You have reached the practical limit of 60 compounds for a single report.', true);
+        return;
+      }
+      // Disallow duplicate CIDs/names
+      const dup = admetCompounds.find(c =>
+        c.compound.trim().toLowerCase() === data.compound.trim().toLowerCase()
+      );
+      if (dup) {
+        admetShowMsg(`"${data.compound}" is already in the list. Each compound can only be added once.`, true);
         return;
       }
       admetCompounds.push(data);
@@ -2554,10 +2585,14 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
     }
 
     async function smilesToCid(smiles) {
-      // PubChem: POST SMILES → CID via identity search
-      const encoded = encodeURIComponent(smiles.trim());
-      const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encoded}/cids/JSON`;
-      const res = await fetch(url);
+      // PubChem: POST SMILES → CID (POST avoids URL-encoding issues with complex SMILES)
+      const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/cids/JSON`;
+      const body = new URLSearchParams({ smiles: smiles.trim() });
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString()
+      });
       if (!res.ok) throw new Error('Not found');
       const data = await res.json();
       const cids = data?.IdentifierList?.CID;
@@ -2576,6 +2611,15 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
 
     smilesInput.addEventListener('input', () => {
       clearTimeout(debounceTimer);
+
+      // If this SMILES value was auto-filled by the CID→SMILES block, skip the reverse lookup
+      // to avoid a race condition where both status indicators overwrite each other.
+      if (smilesInput.dataset.autoFilledByCid === 'true') {
+        setStatus(null);
+        setInfo(null);
+        return;
+      }
+
       const smiles = smilesInput.value.trim();
 
       if (!smiles) {
@@ -2614,6 +2658,171 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
     // Clear auto-fill flag if user manually edits the CID field
     cidInput.addEventListener('input', () => {
       delete cidInput.dataset.autoFilled;
+    });
+  })();
+
+  // ── CID / Name → SMILES auto-lookup ──────────────────────────────
+  (function () {
+    const cidInput     = document.getElementById('admetCompoundId');
+    const smilesInput  = document.getElementById('admetSmilesInput');
+    const statusEl     = document.getElementById('cidToSmilesStatus');
+    const infoEl       = document.getElementById('cidToSmilesInfo');
+
+    let debounceTimer = null;
+    let suppressSmilesListener = false;
+
+    function setStatus(msg, color) {
+      if (!msg) { statusEl.style.display = 'none'; return; }
+      statusEl.textContent = msg;
+      statusEl.style.color = color || 'var(--text-dim)';
+      statusEl.style.display = '';
+    }
+
+    function setInfo(msg, color) {
+      if (!msg) { infoEl.style.display = 'none'; return; }
+      infoEl.textContent = msg;
+      infoEl.style.color = color || 'var(--accent-dim)';
+      infoEl.style.display = '';
+    }
+
+    // Fetch SMILES from a numeric CID — tries multiple properties and endpoints
+    async function cidToSmiles(cid) {
+      const trimmed = String(cid).trim();
+
+      // Primary: request all SMILES properties at once
+      const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${encodeURIComponent(trimmed)}/property/IsomericSMILES,CanonicalSMILES/JSON`;
+      let res = await fetch(url);
+
+      // Fallback: if primary fails, try the compound JSON endpoint
+      if (!res.ok) {
+        const fallbackUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${encodeURIComponent(trimmed)}/JSON`;
+        res = await fetch(fallbackUrl);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        // Extract from full compound JSON
+        const props = data?.PC_Compounds?.[0]?.props;
+        if (props) {
+          const smilesEntry = props.find(p =>
+            p?.urn?.label === 'SMILES' || p?.urn?.name === 'Isomeric' || p?.urn?.name === 'Canonical'
+          );
+          const smiles = smilesEntry?.value?.sval;
+          if (smiles) return { smiles, cid: trimmed };
+        }
+        throw new Error('No SMILES in response');
+      }
+
+      const data = await res.json();
+      const props = data?.PropertyTable?.Properties?.[0];
+      const smiles = props?.IsomericSMILES || props?.CanonicalSMILES;
+      if (!smiles) throw new Error('No SMILES in response');
+      return { smiles, cid: trimmed };
+    }
+
+    // Resolve a compound name → CID, then fetch SMILES
+    async function nameToSmiles(name) {
+      // Step 1: name → CID
+      const cidUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name.trim())}/cids/JSON`;
+      const cidRes = await fetch(cidUrl);
+      if (!cidRes.ok) throw new Error(`Name not found (HTTP ${cidRes.status})`);
+      const cidData = await cidRes.json();
+      const cids = cidData?.IdentifierList?.CID;
+      if (!cids || cids.length === 0) throw new Error('No CID for that name');
+      const resolvedCid = cids[0];
+
+      // Step 2: CID → SMILES
+      const { smiles } = await cidToSmiles(String(resolvedCid));
+      return { smiles, cid: resolvedCid };
+    }
+
+    cidInput.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      const val = cidInput.value.trim(); // capture immediately
+      const isNumeric = /^\d+$/.test(val);
+
+      if (!val) {
+        setStatus(null);
+        setInfo(null);
+        return;
+      }
+
+      debounceTimer = setTimeout(async () => {
+        // Re-check val hasn't changed (guard against stale closures)
+        if (cidInput.value.trim() !== val) return;
+
+        setStatus('⟳ Fetching SMILES…', 'var(--text-dim)');
+        setInfo(null);
+        try {
+          let smiles, resolvedCid;
+
+          if (isNumeric) {
+            ({ smiles, cid: resolvedCid } = await cidToSmiles(val));
+          } else {
+            // Name input — resolve to CID first, then SMILES
+            ({ smiles, cid: resolvedCid } = await nameToSmiles(val));
+          }
+
+          // Guard again: user may have kept typing during the async fetch
+          if (cidInput.value.trim() !== val) return;
+
+          // Auto-fill SMILES if field is empty or was previously auto-filled from CID/name
+          if (!smilesInput.value.trim() || smilesInput.dataset.autoFilledByCid === 'true') {
+            suppressSmilesListener = true;
+            smilesInput.dataset.autoFilledByCid = 'true'; // set BEFORE value so input listener sees it
+            smilesInput.value = smiles;
+            suppressSmilesListener = false;
+          }
+
+          setStatus('✓ SMILES loaded', 'var(--accent)');
+          const label = isNumeric ? `CID ${val}` : `"${val}" (CID ${resolvedCid})`;
+          setInfo(`${label} → SMILES auto-filled from PubChem`, 'var(--accent-dim)');
+
+        } catch (e) {
+          if (cidInput.value.trim() !== val) return;
+          setStatus('✗ Not found', 'var(--error)');
+          const hint = isNumeric
+            ? `Could not fetch SMILES for CID ${val} — enter manually.`
+            : `"${val}" not found in PubChem — try a different name, or enter SMILES manually.`;
+          setInfo(hint, 'var(--slate)');
+        }
+      }, 900);
+    });
+
+    // Clear auto-fill flag only when user manually types in SMILES field
+    smilesInput.addEventListener('input', () => {
+      if (!suppressSmilesListener) {
+        delete smilesInput.dataset.autoFilledByCid;
+      }
+    });
+  })();
+
+  // ── Top Generate Word button sync ────────────────────────────────
+  (function () {
+    const topBtn = document.getElementById('admetGenerateBtnTop');
+    const statusSpan = document.getElementById('admetTopBtnStatus');
+    if (!topBtn) return;
+
+    // Mirror state of the bottom generate button
+    const observer = new MutationObserver(() => {
+      const bottomBtn = document.getElementById('admetGenerateBtn');
+      if (!bottomBtn) return;
+      topBtn.disabled = bottomBtn.disabled;
+      topBtn.style.opacity = bottomBtn.disabled ? '0.5' : '1';
+      topBtn.style.cursor = bottomBtn.disabled ? 'not-allowed' : 'pointer';
+    });
+
+    // Start observing after DOM is ready
+    setTimeout(() => {
+      const bottomBtn = document.getElementById('admetGenerateBtn');
+      if (bottomBtn) {
+        observer.observe(bottomBtn, { attributes: true });
+        topBtn.disabled = bottomBtn.disabled;
+        topBtn.style.opacity = bottomBtn.disabled ? '0.5' : '1';
+      }
+    }, 100);
+
+    topBtn.addEventListener('click', () => {
+      const bottomBtn = document.getElementById('admetGenerateBtn');
+      if (bottomBtn && !bottomBtn.disabled) bottomBtn.click();
     });
   })();
 
