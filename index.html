@@ -959,7 +959,11 @@
       <div class="admet-field-row" style="margin-bottom:4px;">
         <div class="admet-field admet-field-wide">
           <label>SMILES (optional reference)</label>
-          <input type="text" id="admetSmilesInput" placeholder="e.g. CC(=O)Oc1ccccc1C(=O)O" style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--amber);">
+          <div style="position:relative;">
+            <input type="text" id="admetSmilesInput" placeholder="e.g. CC(=O)Oc1ccccc1C(=O)O" style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--amber); width:100%; padding-right:150px;">
+            <span id="smilesToCidStatus" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--text-dim); pointer-events:none; display:none;"></span>
+          </div>
+          <div id="smilesToCidInfo" style="font-size:11.5px; margin-top:5px; color:var(--accent-dim); display:none;"></div>
         </div>
       </div>
 
@@ -2250,21 +2254,23 @@
     }
     let filled = 0;
 
-    // LD50
-    const ld50 = grab(/LD50[^\d]*([\d.]+)\s*mg\/kg/i);
+    // LD50 — matches "Predicted LD50: 2000mg/kg" or "LD50: 2000 mg/kg"
+    const ld50 = grab(/(?:Predicted\s+)?LD50[:\s]*([\d.]+)\s*mg\/kg/i);
     if (ld50) { document.getElementById('admet_ld50').value = ld50; filled++; }
 
-    // GHS class — Acute Oral Toxicity
-    const ghs = grab(/(?:Predicted GHS category|Acute Oral Toxicity|GHS\s*(?:class|category)?)[^\d]*([1-5])/i);
+    // GHS class — matches "Predicted Toxicity Class: 4" or old format
+    const ghs = grab(/(?:Predicted\s+Toxicity\s+Class|Predicted GHS category|Acute Oral Toxicity|GHS\s*(?:class|category)?)[:\s]*([1-5])/i);
     if (ghs) { setSelectVal('admet_ghs', ghs); filled++; }
 
-    // Endpoint activity fields
+    // Endpoint activity fields — handles both:
+    //   "Hepatotoxicity  Active" (old) and
+    //   "Hepatotoxicity\tdili\tInactive\t0.66" (new table format)
     const endpoints = [
-      ['admet_hepato', /Hepatotoxicity\s+(Active|Inactive)/i],
-      ['admet_carcino', /Carcinogenicity\s+(Active|Inactive)/i],
-      ['admet_immuno', /Immunotoxicity\s+(Active|Inactive)/i],
-      ['admet_mutagen', /Mutagenicity\s+(Active|Inactive)/i],
-      ['admet_cyto', /Cytotoxicity\s+(Active|Inactive)/i],
+      ['admet_hepato',  /Hepatotoxicity[\t\s]+(?:\w+[\t\s]+)?(Active|Inactive)/i],
+      ['admet_carcino', /Carcinogenicity[\t\s]+(?:\w+[\t\s]+)?(Active|Inactive)/i],
+      ['admet_immuno',  /Immunotoxicity[\t\s]+(?:\w+[\t\s]+)?(Active|Inactive)/i],
+      ['admet_mutagen', /Mutagenicity[\t\s]+(?:\w+[\t\s]+)?(Active|Inactive)/i],
+      ['admet_cyto',    /Cytotoxicity[\t\s]+(?:\w+[\t\s]+)?(Active|Inactive)/i],
     ];
     for (const [id, re] of endpoints) {
       const val = grab(re);
@@ -2273,6 +2279,41 @@
         filled++;
       }
     }
+
+    // Also fill SMILES from ProTox output (Name field contains SMILES)
+    const smiles = grab(/^(?:Name|SMILES)\s+([\S]+)/m);
+    if (smiles && smiles.includes('=')) {
+      const smilesEl = document.getElementById('admetSmilesInput');
+      if (smilesEl && !smilesEl.value) { smilesEl.value = smiles; filled++; }
+    }
+
+    // Molecular weight from ProTox output
+    const mw = grab(/Molweight\s+([\d.]+)/i);
+    if (mw) { document.getElementById('admet_mw').value = mw; filled++; }
+
+    // Heavy atoms from ProTox output ("Number of atoms")
+    const atoms = grab(/Number of atoms\s+(\d+)/i);
+    if (atoms) { document.getElementById('admet_heavyAtoms').value = atoms; filled++; }
+
+    // Rotatable bonds from ProTox output
+    const rot = grab(/Number of rotable bonds\s+(\d+)/i);
+    if (rot) { document.getElementById('admet_rotBonds').value = rot; filled++; }
+
+    // H-bond acceptors from ProTox output
+    const hAcc = grab(/Number of hydrogen bond acceptors\s+(\d+)/i);
+    if (hAcc) { document.getElementById('admet_hAcceptors').value = hAcc; filled++; }
+
+    // H-bond donors from ProTox output
+    const hDon = grab(/Number of hydrogen bond donors\s+(\d+)/i);
+    if (hDon) { document.getElementById('admet_hDonors').value = hDon; filled++; }
+
+    // Molar refractivity from ProTox output
+    const mr = grab(/Molecular refractivity\s+([\d.]+)/i);
+    if (mr) { document.getElementById('admet_molarRef').value = mr; filled++; }
+
+    // LogP from ProTox output
+    const logp = grab(/octanol\/water partition coefficient\s*\(logP\)\s*([\d.+-]+)/i);
+    if (logp) { document.getElementById('admet_logp').value = logp; filled++; }
 
     return filled;
   }
@@ -2301,6 +2342,94 @@
     document.getElementById('protoxPaste').value = '';
     document.getElementById('parseResultMsg').classList.remove('show', 'error');
   });
+
+
+  // ── SMILES → CID auto-lookup ────────────────────────────────────
+  (function () {
+    const smilesInput  = document.getElementById('admetSmilesInput');
+    const cidInput     = document.getElementById('admetCompoundId');
+    const statusEl     = document.getElementById('smilesToCidStatus');
+    const infoEl       = document.getElementById('smilesToCidInfo');
+
+    let debounceTimer = null;
+
+    function setStatus(msg, color) {
+      if (!msg) { statusEl.style.display = 'none'; return; }
+      statusEl.textContent = msg;
+      statusEl.style.color = color || 'var(--text-dim)';
+      statusEl.style.display = '';
+    }
+
+    function setInfo(msg, color) {
+      if (!msg) { infoEl.style.display = 'none'; return; }
+      infoEl.textContent = msg;
+      infoEl.style.color = color || 'var(--accent-dim)';
+      infoEl.style.display = '';
+    }
+
+    async function smilesToCid(smiles) {
+      // PubChem: POST SMILES → CID via identity search
+      const encoded = encodeURIComponent(smiles.trim());
+      const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encoded}/cids/JSON`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Not found');
+      const data = await res.json();
+      const cids = data?.IdentifierList?.CID;
+      if (!cids || cids.length === 0) throw new Error('No CID found');
+      return cids[0];
+    }
+
+    async function cidToName(cid) {
+      const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/property/IUPACName,Title/JSON`;
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const props = data?.PropertyTable?.Properties?.[0];
+      return props?.Title || props?.IUPACName || null;
+    }
+
+    smilesInput.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      const smiles = smilesInput.value.trim();
+
+      if (!smiles) {
+        setStatus(null);
+        setInfo(null);
+        return;
+      }
+
+      // Debounce: wait 800ms after user stops typing
+      debounceTimer = setTimeout(async () => {
+        setStatus('⟳ Looking up CID…', 'var(--text-dim)');
+        setInfo(null);
+
+        try {
+          const cid = await smilesToCid(smiles);
+
+          // Auto-fill CID if the field is empty or previously auto-filled
+          if (!cidInput.value.trim() || cidInput.dataset.autoFilled === 'smiles') {
+            cidInput.value = String(cid);
+            cidInput.dataset.autoFilled = 'smiles';
+          }
+
+          setStatus(`✓ CID ${cid}`, 'var(--accent)');
+
+          // Try to get name as extra info
+          const name = await cidToName(cid);
+          if (name) setInfo(`→ ${name}`, 'var(--accent-dim)');
+
+        } catch (e) {
+          setStatus('No match', 'var(--error)');
+          setInfo('SMILES not found in PubChem — enter CID manually.', 'var(--slate)');
+        }
+      }, 800);
+    });
+
+    // Clear auto-fill flag if user manually edits the CID field
+    cidInput.addEventListener('input', () => {
+      delete cidInput.dataset.autoFilled;
+    });
+  })();
 
 </script>
 
