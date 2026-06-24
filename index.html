@@ -2103,12 +2103,18 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
       pages.push(admetCompounds.slice(i, i + PAGE_SIZE));
     }
 
-    const CONTENT_WIDTH = 13200; // landscape US Letter content width approx (DXA)
-    const LABEL_COL_W = 1500;
-    const ATTR_COL_W = 1700;
+    // Landscape US Letter: page width 15840, margins 720 each side → content 14400 DXA
+    const CONTENT_WIDTH = 14400;
+    const LABEL_COL_W = 1600;
+    const ATTR_COL_W = 1900;
 
     function buildTableAPage(pageCompounds, startIndex) {
-      const dataColW = Math.floor((CONTENT_WIDTH - LABEL_COL_W - ATTR_COL_W) / pageCompounds.length);
+      const n = pageCompounds.length;
+      // Distribute remaining width evenly; clamp so total never exceeds CONTENT_WIDTH
+      const remaining = CONTENT_WIDTH - LABEL_COL_W - ATTR_COL_W;
+      const dataColW = Math.floor(remaining / n);
+      // Use exact total to avoid sub-pixel overflow
+      const totalW = LABEL_COL_W + ATTR_COL_W + dataColW * n;
       const columnWidths = [LABEL_COL_W, ATTR_COL_W, ...pageCompounds.map(() => dataColW)];
 
       const headerRow = new TableRow({
@@ -2116,7 +2122,8 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
         children: [
           headCell('Properties', LABEL_COL_W),
           headCell('Attributes', ATTR_COL_W),
-          ...pageCompounds.map((c, i) => headCell(`C${startIndex + i + 1}`, dataColW)),
+          // Use CID number (c.compound) instead of C1/C2/C3 labels
+          ...pageCompounds.map((c) => headCell(c.compound, dataColW)),
         ]
       });
 
@@ -2134,34 +2141,36 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
       });
 
       return new Table({
-        width: { size: CONTENT_WIDTH, type: WIDTH_DXA },
+        width: { size: totalW, type: WIDTH_DXA },
         columnWidths,
         rows: [headerRow, ...bodyRows],
       });
     }
 
     function buildTableBPage(pageCompounds, startIndex) {
-      const nameColW = 2400;
+      const nameColW = 2600;
       const dataColW = Math.floor((CONTENT_WIDTH - nameColW) / tableBCols.length);
+      const totalW = nameColW + dataColW * tableBCols.length;
       const columnWidths = [nameColW, ...tableBCols.map(() => dataColW)];
 
       const headerRow = new TableRow({
         tableHeader: true,
         children: [
-          headCell('Compound (CID / Name)', nameColW),
+          headCell('CID / Name', nameColW),
           ...tableBCols.map(([label]) => headCell(label, dataColW)),
         ]
       });
 
       const bodyRows = pageCompounds.map((c, i) => new TableRow({
         children: [
-          labelCell(`C${startIndex + i + 1} — ${c.compound}`, nameColW),
+          // Use CID number (c.compound) directly — no C1/C2/C3 prefix
+          labelCell(c.compound, nameColW),
           ...tableBCols.map(([, fieldId]) => dataCell(admetVal(c, fieldId), dataColW)),
         ]
       }));
 
       return new Table({
-        width: { size: CONTENT_WIDTH, type: WIDTH_DXA },
+        width: { size: totalW, type: WIDTH_DXA },
         columnWidths,
         rows: [headerRow, ...bodyRows],
       });
@@ -2184,8 +2193,8 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
     pages.forEach((pageCompounds, pIdx) => {
       const startIndex = pIdx * PAGE_SIZE;
       const rangeLabel = pageCompounds.length > 1
-        ? `Compounds C${startIndex + 1} – C${startIndex + pageCompounds.length}`
-        : `Compound C${startIndex + 1}`;
+        ? `CIDs: ${pageCompounds.map(c => c.compound).join(', ')}`
+        : `CID: ${pageCompounds[0].compound}`;
 
       children.push(new Paragraph({
         heading: HEADING_2,
@@ -2203,8 +2212,8 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
     pages.forEach((pageCompounds, pIdx) => {
       const startIndex = pIdx * PAGE_SIZE;
       const rangeLabel = pageCompounds.length > 1
-        ? `Compounds C${startIndex + 1} – C${startIndex + pageCompounds.length}`
-        : `Compound C${startIndex + 1}`;
+        ? `CIDs: ${pageCompounds.map(c => c.compound).join(', ')}`
+        : `CID: ${pageCompounds[0].compound}`;
 
       children.push(new Paragraph({
         heading: HEADING_2,
