@@ -322,6 +322,17 @@
     max-width: 200px;
   }
 
+  td.name-cell a {
+    color: var(--text);
+    text-decoration: none;
+    border-bottom: 1px dashed var(--accent-dim);
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+  td.name-cell a:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
   td.formula-cell {
     font-family: 'IBM Plex Mono', monospace;
     color: var(--text-dim);
@@ -1115,7 +1126,7 @@
             </div>
           </td>
           <td class="cid-cell">${escapeHtml(r.cid)}</td>
-          <td class="name-cell" title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</td>
+          <td class="name-cell" title="${escapeHtml(r.name)}"><a href="https://pubchem.ncbi.nlm.nih.gov/#query=${encodeURIComponent(r.name || r.cid)}" target="_blank" rel="noopener">${escapeHtml(r.name)}</a></td>
           <td class="formula-cell">${escapeHtml(r.formula)}</td>
           <td class="formula-cell">${escapeHtml(r.weight)}</td>
           <td class="smiles-cell" title="${escapeHtml(r.smiles)}">${escapeHtml(r.smiles)}</td>
