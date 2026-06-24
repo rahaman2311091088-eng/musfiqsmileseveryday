@@ -1973,263 +1973,71 @@
 
   admetRenderList();
 
-  // ===== SMILES Auto-fetch: SwissADME (ADME) + ProTox-3 (Toxicity) — No API key needed =====
+  // ===== SMILES Auto-fetch using ADMETlab 3.0 API (has CORS support) =====
   const admetAutoFetchBtn = document.getElementById('admetAutoFetchBtn');
   const admetSmilesInput  = document.getElementById('admetSmilesInput');
   const admetFetchStatus  = document.getElementById('admetFetchStatus');
 
-  // CORS proxy list — tried in order until one works
-  const CORS_PROXIES = [
-    'https://api.allorigins.win/raw?url=',
-    'https://corsproxy.io/?',
-    'https://cors-anywhere.herokuapp.com/',
-    'https://thingproxy.freeboard.io/fetch/',
-  ];
-
-  async function fetchWithCorsProxy(url, options = {}) {
-    let lastErr;
-    for (const proxy of CORS_PROXIES) {
-      try {
-        const proxyUrl = proxy + encodeURIComponent(url);
-        const res = await fetch(proxyUrl, { ...options, signal: AbortSignal.timeout(10000) });
-        if (res.ok) return res;
-        lastErr = new Error(`HTTP ${res.status}`);
-      } catch (e) { lastErr = e; }
-    }
-    throw lastErr || new Error('All CORS proxies failed');
-  }
+  const ADMETLAB_API = 'https://admetlab3.scbdd.com/api/admet';
 
   function setFetchStatus(msg, color, isHtml = false) {
     admetFetchStatus.style.display = msg ? 'block' : 'none';
     if (isHtml) admetFetchStatus.innerHTML = msg;
     else        admetFetchStatus.textContent = msg;
-    admetFetchStatus.style.color   = color || 'var(--text-dim)';
+    admetFetchStatus.style.color = color || 'var(--text-dim)';
   }
 
-  // ── SwissADME ──────────────────────────────────────────────────────────────
-  async function fetchSwissADME(smiles) {
-    const TARGET = 'http://www.swissadme.ch/include/submitjob.php';
-    const body   = new URLSearchParams({ smiles });
-
-    const submitRes = await fetchWithCorsProxy(TARGET, {
-      method : 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body
-    });
-    const submitText = await submitRes.text();
-
-    let resultUrl = '';
-    const metaMatch = submitText.match(/url=([^"'>\s]+)/i);
-    if (metaMatch) {
-      resultUrl = metaMatch[1].startsWith('http')
-        ? metaMatch[1]
-        : 'http://www.swissadme.ch/' + metaMatch[1];
-    }
-
-    let html = submitText;
-    if (resultUrl) {
-      await new Promise(r => setTimeout(r, 2500));
-      const resultRes = await fetchWithCorsProxy(resultUrl);
-      html = await resultRes.text();
-    }
-
-    return parseSwissADME(html);
-  }
-
-  function parseSwissADME(html) {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const result = {};
-
-    // SwissADME outputs data in a CSV download link AND in the property table rows.
-    // We'll scrape the visible table cells which have data-param attributes or
-    // recognisable td patterns.
-
-    // Helper: find table cell by searching for its label text nearby
-    function getCellText(label) {
-      const els = [...doc.querySelectorAll('td, th')];
-      for (const el of els) {
-        if (el.textContent.trim().toLowerCase().includes(label.toLowerCase())) {
-          const next = el.nextElementSibling;
-          if (next) return next.textContent.trim();
-        }
-      }
-      return '';
-    }
-
-    // Try to pull data from the CSV export link if present
-    const csvLink = [...doc.querySelectorAll('a[href]')].find(a => a.href.includes('.csv') || a.textContent.includes('CSV'));
-    if (csvLink) {
-      result._csvUrl = csvLink.href;
-    }
-
-    // Parse key fields — SwissADME HTML table labels
-    result.mw          = getCellText('Mol. MW')       || getCellText('Molecular weight') || getCellText('MW');
-    result.heavyAtoms  = getCellText('Heavy atoms')   || getCellText('#Heavy atoms');
-    result.aromAtoms   = getCellText('Arom. heavy atoms') || getCellText('Aromatic rings');
-    result.rotBonds    = getCellText('Rotatable bonds')   || getCellText('#Rotatable bonds');
-    result.hAcceptors  = getCellText('H-bond acceptors')  || getCellText('#H-bond acceptors');
-    result.hDonors     = getCellText('H-bond donors')     || getCellText('#H-bond donors');
-    result.molarRef    = getCellText('Molar refractivity');
-    result.logp        = getCellText('Consensus Log P')   || getCellText('WLOGP') || getCellText('Log P');
-    result.logs        = getCellText('Log S (ESOL)')      || getCellText('ESOL Log S') || getCellText('Log S');
-    result.gi          = getCellText('GI absorption');
-    result.bbb         = getCellText('BBB permeant');
-    result.lipinski    = getCellText('Lipinski');
-    result.ghose       = getCellText('Ghose');
-    result.veber       = getCellText('Veber');
-    result.egan        = getCellText('Egan');
-    result.muegge      = getCellText('Muegge');
-    result.bioavail    = getCellText('Bioavailability Score');
-    result.synAccess   = getCellText('Synthetic accessibility') || getCellText('SA score');
-
-    return result;
-  }
-
-  // Fallback: try SwissADME direct API then proxy
-  async function fetchSwissADME_CSV(smiles) {
-    const apiUrl = `https://swissadme.ch/swissadme/run.php?smiles=${encodeURIComponent(smiles)}`;
-    let text = '';
-    try {
-      const direct = await fetch(apiUrl, { signal: AbortSignal.timeout(8000) });
-      if (direct.ok) { text = await direct.text(); }
-    } catch (_) {}
-    if (!text) {
-      const res = await fetchWithCorsProxy(apiUrl);
-      text = await res.text();
-    }
-    return parseSwissADME_CSV(text);
-  }
-
-  function parseSwissADME_CSV(csv) {
-    // CSV format: header row then data row(s)
-    const lines = csv.trim().split('\n').filter(Boolean);
-    if (lines.length < 2) return {};
-    const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
-    const values  = lines[1].split(',').map(v => v.replace(/"/g, '').trim());
-    const row = {};
-    headers.forEach((h, i) => { row[h] = values[i] || ''; });
-
-    const get = (...keys) => {
+  // Map ADMETlab 3.0 JSON keys → our field IDs
+  // ADMETlab returns a flat object per molecule inside data.data[0]
+  function mapAdmetlabToFields(mol) {
+    // Helper: pick first truthy value from a list of candidate keys
+    const pick = (...keys) => {
       for (const k of keys) {
-        const found = Object.keys(row).find(h => h.toLowerCase().includes(k.toLowerCase()));
-        if (found && row[found]) return row[found];
+        const val = mol[k];
+        if (val !== undefined && val !== null && val !== '') return String(val);
       }
       return '';
+    };
+
+    // Lipinski etc. come as 0/1 or "Yes"/"No" — normalise to Yes/No
+    const yesNo = (v) => {
+      if (v === undefined || v === null || v === '') return '';
+      if (typeof v === 'number') return v === 1 ? 'Yes' : 'No';
+      const s = String(v).toLowerCase();
+      if (s === 'yes' || s === 'true' || s === '1') return 'Yes';
+      if (s === 'no'  || s === 'false'|| s === '0') return 'No';
+      return String(v);
     };
 
     return {
-      mw        : get('Molecular Weight', 'MW', 'Mol. MW'),
-      heavyAtoms: get('Heavy Atoms', '#Heavy'),
-      aromAtoms : get('Aromatic', 'Arom'),
-      rotBonds  : get('Rotatable Bond', '#Rotatable'),
-      hAcceptors: get('H-bond acceptors', '#H-bond acc'),
-      hDonors   : get('H-bond donors',    '#H-bond don'),
-      molarRef  : get('Molar Refractivity', 'MR'),
-      logp      : get('Consensus Log P', 'WLOGP', 'iLogP'),
-      logs      : get('ESOL Log S', 'Log S'),
-      gi        : get('GI absorption'),
-      bbb       : get('BBB permeant'),
-      lipinski  : get('Lipinski'),
-      ghose     : get('Ghose'),
-      veber     : get('Veber'),
-      egan      : get('Egan'),
-      muegge    : get('Muegge'),
-      bioavail  : get('Bioavailability Score'),
-      synAccess : get('Synthetic accessibility', 'SA score'),
+      admet_mw         : pick('MW', 'Molecular Weight', 'mol_weight'),
+      admet_heavyAtoms : pick('nHeavyAtom', 'Heavy Atoms', 'heavy_atoms'),
+      admet_aromAtoms  : pick('nAromAtom', 'Aromatic Heavy Atoms', 'arom_atoms'),
+      admet_rotBonds   : pick('nRot', 'Rotatable Bonds', 'rot_bonds'),
+      admet_hAcceptors : pick('nHAcc', 'H-Bond Acceptors', 'hba'),
+      admet_hDonors    : pick('nHDon', 'H-Bond Donors', 'hbd'),
+      admet_molarRef   : pick('MR', 'Molar Refractivity', 'molar_ref'),
+      admet_logp       : pick('Consensus_Log_Po_w', 'WLOGP', 'logp', 'iLogP'),
+      admet_logs       : pick('ESOL_log_S', 'logS', 'log_s'),
+      admet_gi         : pick('GI_absorption', 'GI Absorption', 'gi'),
+      admet_bbb        : yesNo(mol['BBB_permeability'] ?? mol['BBB permeant'] ?? mol['bbb']),
+      admet_lipinski   : yesNo(mol['Lipinski'] ?? mol['lipinski']),
+      admet_ghose      : yesNo(mol['Ghose']    ?? mol['ghose']),
+      admet_veber      : yesNo(mol['Veber']    ?? mol['veber']),
+      admet_egan       : yesNo(mol['Egan']     ?? mol['egan']),
+      admet_muegge     : yesNo(mol['Muegge']   ?? mol['muegge']),
+      admet_bioavail   : pick('Bioavailability_Score', 'Bioavailability Score', 'bioavail'),
+      admet_synAccess  : pick('SAscore', 'SA_score', 'Synthetic_Accessibility', 'synAccess'),
+      admet_ld50       : pick('LD50_oral', 'acute_oral_toxicity', 'LD50'),
+      admet_hepato     : pick('Hepatotoxicity', 'hepato'),
+      admet_carcino    : pick('Carcinogenicity', 'carcino'),
+      admet_immuno     : pick('Immunotoxicity', 'immuno'),
+      admet_mutagen    : pick('Mutagenicity', 'AMES', 'mutagen'),
+      admet_cyto       : pick('Cytotoxicity', 'cyto'),
+      admet_ghs        : pick('GHS_category', 'ghs'),
     };
   }
 
-  // ── ProTox-3 ───────────────────────────────────────────────────────────────
-  // ProTox-3 (tox-new.charite.de) accepts a SMILES POST and returns a result page.
-  async function fetchProTox3(smiles) {
-    const TARGET = 'https://tox-new.charite.de/protox3/index.php?site=compound_input';
-    const body   = new URLSearchParams({ smiles_input: smiles, 'submit': 'Predict toxicity' });
-
-    const res = await fetchWithCorsProxy(TARGET, {
-      method : 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body
-    });
-    const html = await res.text();
-    return parseProTox3(html);
-  }
-
-  function parseProTox3(html) {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const result = {};
-
-    function getCellText(label) {
-      const els = [...doc.querySelectorAll('td, th, dt, dd, span, div')];
-      for (const el of els) {
-        const txt = el.textContent.trim();
-        if (txt.toLowerCase().includes(label.toLowerCase())) {
-          const next = el.nextElementSibling;
-          if (next) return next.textContent.trim();
-          // Try sibling td
-          if (el.tagName === 'TD' && el.nextElementSibling) return el.nextElementSibling.textContent.trim();
-        }
-      }
-      return '';
-    }
-
-    // LD50 — ProTox often shows it prominently
-    const ld50Match = html.match(/LD50[^<]*?(\d+(?:\.\d+)?)\s*mg\/kg/i);
-    result.ld50 = ld50Match ? Math.round(parseFloat(ld50Match[1])).toString() : getCellText('LD50') || getCellText('Predicted LD50');
-
-    // GHS category
-    const ghsMatch = html.match(/GHS\s*(?:category|class|oral\s*toxicity)[^<]*?(\d)/i)
-                  || html.match(/class\s*(\d)/i)
-                  || html.match(/Category\s*(\d)/i);
-    result.ghs = ghsMatch ? ghsMatch[1] : getCellText('GHS');
-
-    // Toxicity endpoints — ProTox-3 lists these as Active/Inactive
-    const endpoints = {
-      hepato  : ['Hepatotoxicity', 'Hepato'],
-      carcino : ['Carcinogenicity', 'Carcino'],
-      immuno  : ['Immunotoxicity', 'Immuno'],
-      mutagen : ['Mutagenicity', 'Mutagen', 'Ames'],
-      cyto    : ['Cytotoxicity', 'Cyto'],
-    };
-
-    // Scan all table rows for endpoint+prediction pairs
-    const rows = [...doc.querySelectorAll('tr')];
-    for (const row of rows) {
-      const cells = [...row.querySelectorAll('td, th')].map(c => c.textContent.trim());
-      if (cells.length >= 2) {
-        for (const [key, labels] of Object.entries(endpoints)) {
-          if (!result[key]) {
-            for (const lbl of labels) {
-              if (cells[0].toLowerCase().includes(lbl.toLowerCase())) {
-                // Usually second cell is Active/Inactive/probability
-                let val = cells[1] || '';
-                if (/active/i.test(val))   result[key] = 'Active';
-                if (/inactive/i.test(val)) result[key] = 'Inactive';
-                if (!result[key] && cells[2]) {
-                  if (/active/i.test(cells[2]))   result[key] = 'Active';
-                  if (/inactive/i.test(cells[2])) result[key] = 'Inactive';
-                }
-                break;
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // Also regex-scan the raw HTML as fallback
-    for (const [key, labels] of Object.entries(endpoints)) {
-      if (!result[key]) {
-        for (const lbl of labels) {
-          const m = html.match(new RegExp(lbl + '[^<]{0,80}?(Active|Inactive)', 'i'));
-          if (m) { result[key] = m[1]; break; }
-        }
-      }
-    }
-
-    return result;
-  }
-
-  // ── Master fetch & fill ────────────────────────────────────────────────────
   admetAutoFetchBtn.addEventListener('click', async () => {
     const smiles = admetSmilesInput.value.trim();
     if (!smiles) {
@@ -2239,112 +2047,63 @@
 
     admetAutoFetchBtn.disabled = true;
     admetAutoFetchBtn.textContent = '⏳ Fetching…';
-    setFetchStatus('Step 1/2 — Querying SwissADME for ADME properties…', 'var(--text-dim)');
+    setFetchStatus('Querying ADMETlab 3.0 API…', 'var(--text-dim)');
 
-    let adme = {}, tox = {}, admeSource = '', toxSource = '';
-    let admeError = '', toxError = '';
-
-    // ── Step 1: SwissADME ──
     try {
-      // Try the CSV API first (faster & more reliable)
-      adme = await fetchSwissADME_CSV(smiles);
-      admeSource = 'SwissADME API';
+      const res = await fetch(ADMETLAB_API, {
+        method : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body   : JSON.stringify({ SMILES: [smiles] }),
+        signal : AbortSignal.timeout(30000),
+      });
 
-      // If we got mostly empty results, fall back to HTML scraping
-      const filled = Object.values(adme).filter(v => v && v.length > 0).length;
-      if (filled < 4) {
-        setFetchStatus('Step 1/2 — SwissADME API returned sparse data, trying HTML route…', 'var(--text-dim)');
-        adme = await fetchSwissADME(smiles);
-        admeSource = 'SwissADME (HTML)';
+      if (!res.ok) throw new Error(`ADMETlab API returned ${res.status}`);
+      const json = await res.json();
+
+      // ADMETlab 3.0 response: { code, data: { data: [ {...mol props...} ] } }
+      const molData = json?.data?.data?.[0] ?? json?.data?.[0] ?? json?.[0] ?? null;
+      if (!molData) throw new Error('Unexpected API response structure');
+
+      const fields = mapAdmetlabToFields(molData);
+
+      let filled = 0;
+      for (const [id, val] of Object.entries(fields)) {
+        if (!val) continue;
+        const el = document.getElementById(id);
+        if (!el) continue;
+        if (el.tagName === 'SELECT') {
+          const match = Array.from(el.options).find(o => o.value.toLowerCase() === val.toLowerCase());
+          el.value = match ? match.value : val;
+        } else {
+          el.value = val;
+        }
+        filled++;
       }
-    } catch (e) {
-      admeError = e.message;
-      // Try HTML scraping as a last resort
-      try {
-        adme = await fetchSwissADME(smiles);
-        admeSource = 'SwissADME (HTML fallback)';
-        admeError = '';
-      } catch (e2) {
-        admeError = 'SwissADME unreachable via proxy. ADME fields left blank.';
-      }
-    }
 
-    setFetchStatus('Step 2/2 — Querying ProTox-3 for toxicity data…', 'var(--text-dim)');
-
-    // ── Step 2: ProTox-3 ──
-    try {
-      tox = await fetchProTox3(smiles);
-      toxSource = 'ProTox-3';
-    } catch (e) {
-      toxError = 'ProTox-3 unreachable via proxy. Toxicity fields left blank.';
-    }
-
-    // ── Fill form fields ──
-    const fieldMap = {
-      admet_mw         : adme.mw,
-      admet_heavyAtoms : adme.heavyAtoms,
-      admet_aromAtoms  : adme.aromAtoms,
-      admet_rotBonds   : adme.rotBonds,
-      admet_hAcceptors : adme.hAcceptors,
-      admet_hDonors    : adme.hDonors,
-      admet_molarRef   : adme.molarRef,
-      admet_logp       : adme.logp,
-      admet_logs       : adme.logs,
-      admet_gi         : adme.gi,
-      admet_bbb        : adme.bbb,
-      admet_lipinski   : adme.lipinski,
-      admet_ghose      : adme.ghose,
-      admet_veber      : adme.veber,
-      admet_egan       : adme.egan,
-      admet_muegge     : adme.muegge,
-      admet_bioavail   : adme.bioavail,
-      admet_synAccess  : adme.synAccess,
-      admet_ld50       : tox.ld50,
-      admet_hepato     : tox.hepato,
-      admet_carcino    : tox.carcino,
-      admet_immuno     : tox.immuno,
-      admet_mutagen    : tox.mutagen,
-      admet_cyto       : tox.cyto,
-      admet_ghs        : tox.ghs,
-    };
-
-    let filled = 0;
-    for (const [id, val] of Object.entries(fieldMap)) {
-      if (!val) continue;
-      const el = document.getElementById(id);
-      if (!el) continue;
-      if (el.tagName === 'SELECT') {
-        const opts = Array.from(el.options).map(o => o.value.toLowerCase());
-        const match = Array.from(el.options).find(o => o.value.toLowerCase() === String(val).toLowerCase());
-        if (match) { el.value = match.value; filled++; }
-        else { el.value = val; filled++; }
+      if (filled > 0) {
+        setFetchStatus(`✓ ADMETlab 3.0: ${filled} fields filled automatically. Review and edit if needed, then click "Add compound".`, 'var(--accent)');
       } else {
-        el.value = val; filled++;
+        // API responded but keys didn't match — show them for debugging
+        const keys = Object.keys(molData).slice(0, 20).join(', ');
+        setFetchStatus(
+          `⚠ ADMETlab API responded but field mapping returned 0 matches.
+` +
+          `Available keys: ${keys}
+` +
+          `Please fill in the fields manually or open SwissADME / ProTox-3 below.`,
+          'var(--amber)'
+        );
       }
-    }
-
-    // Status message
-    const admeFilledCount = Object.values(adme).filter(v => v && v.length > 0).length;
-    const toxFilledCount  = Object.values(tox).filter(v => v && v.length > 0).length;
-
-    let statusParts = [];
-    if (admeFilledCount > 0) statusParts.push(`✓ ADME: ${admeFilledCount} fields from ${admeSource}`);
-    if (admeError)           statusParts.push(`⚠ ${admeError}`);
-    if (toxFilledCount > 0)  statusParts.push(`✓ Toxicity: ${toxFilledCount} fields from ${toxSource}`);
-    if (toxError)            statusParts.push(`⚠ ${toxError}`);
-
-    if (filled === 0) {
-      const smilesEncoded = encodeURIComponent(smiles);
+    } catch (err) {
+      // Fallback: show helpful manual links
       setFetchStatus(
-        `⚠ Auto-fetch could not reach the external servers (CORS restriction).<br><br>` +
-        `Please visit these sites manually, paste your SMILES, and copy the values into the fields below:<br>` +
-        `&nbsp;• <a href="https://www.swissadme.ch/" target="_blank" style="color:var(--accent)">SwissADME</a> — for ADME properties<br>` +
-        `&nbsp;• <a href="https://tox-new.charite.de/protox3/" target="_blank" style="color:var(--accent)">ProTox-3</a> — for toxicity data`,
+        `⚠ Auto-fetch failed: ${err.message}.<br><br>` +
+        `Please visit these sites manually, paste your SMILES, and copy values below:<br>` +
+        `&nbsp;• <a href="https://www.swissadme.ch/" target="_blank" style="color:var(--accent)">SwissADME</a> — physicochemical &amp; ADME<br>` +
+        `&nbsp;• <a href="https://tox-new.charite.de/protox3/" target="_blank" style="color:var(--accent)">ProTox-3</a> — toxicity &amp; LD50<br>` +
+        `&nbsp;• <a href="https://admetlab3.scbdd.com/" target="_blank" style="color:var(--accent)">ADMETlab 3.0</a> — all-in-one`,
         'var(--amber)', true
       );
-    } else {
-      statusParts.push(`\nTotal: ${filled} fields filled. Review and edit if needed, then click "Add compound".`);
-      setFetchStatus(statusParts.join('\n'), filled > 5 ? 'var(--accent)' : 'var(--amber)');
     }
 
     admetAutoFetchBtn.disabled = false;
