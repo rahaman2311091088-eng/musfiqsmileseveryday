@@ -175,6 +175,42 @@
     color: var(--slate);
     margin-top: 12px;
   }
+
+  /* Floating "Add compound" shortcut — appears while scrolling the long form */
+  #admetFab {
+    position: fixed;
+    right: 22px;
+    bottom: 22px;
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--accent);
+    color: #0A1721;
+    border: none;
+    border-radius: 30px;
+    padding: 13px 20px 13px 16px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    box-shadow: 0 6px 22px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.05);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px) scale(0.96);
+    transition: opacity 0.18s ease, transform 0.18s ease, background 0.15s ease, visibility 0.18s;
+  }
+  #admetFab.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+  }
+  #admetFab:hover { background: #9CF0D6; }
+  #admetFab:active { transform: scale(0.96); }
+  #admetFab svg { width: 18px; height: 18px; flex-shrink: 0; }
+  @media (max-width: 560px) {
+    #admetFab { right: 14px; bottom: 14px; padding: 12px 16px 12px 14px; font-size: 13px; }
+  }
   .hint button {
     background: none; border: none; padding: 0;
     color: var(--accent-dim);
@@ -1104,6 +1140,12 @@
       <div class="auth-msg" id="admetFormMsg"></div>
     </div>
 
+    <!-- Floating shortcut: lets you add the compound without scrolling back down to the form's bottom -->
+    <button id="admetFab" type="button" aria-label="Add compound">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      <span id="admetFabLabel">Add compound</span>
+    </button>
+
     <div class="results-wrap active" id="admetListWrap" style="margin-top:28px;">
       <div class="results-header">
         <div class="results-title" id="admetListTitle">0 compounds added</div>
@@ -1874,6 +1916,32 @@
 
   admetClearFormBtn.addEventListener('click', admetClearForm);
 
+  // ----- Floating "Add compound" shortcut -----
+  const admetFab = document.getElementById('admetFab');
+  const admetFabLabel = document.getElementById('admetFabLabel');
+
+  // Keep the FAB's label in sync with the real button (e.g. "Add compound" vs "Save changes to C3")
+  function admetSyncFabLabel() {
+    admetFabLabel.textContent = admetAddBtn.textContent;
+  }
+  const admetAddBtnObserver = new MutationObserver(admetSyncFabLabel);
+  admetAddBtnObserver.observe(admetAddBtn, { childList: true, characterData: true, subtree: true });
+  admetSyncFabLabel();
+
+  // Clicking the FAB does exactly what the real "Add compound" button does
+  admetFab.addEventListener('click', () => admetAddBtn.click());
+
+  // Show the FAB only once the real button has scrolled out of view above the viewport,
+  // so it doesn't clutter the screen while the actual button is already visible
+  function admetUpdateFabVisibility() {
+    const rect = admetAddBtn.getBoundingClientRect();
+    const realBtnVisible = rect.top < window.innerHeight && rect.bottom > 0;
+    admetFab.classList.toggle('show', !realBtnVisible);
+  }
+  window.addEventListener('scroll', admetUpdateFabVisibility, { passive: true });
+  window.addEventListener('resize', admetUpdateFabVisibility);
+  admetUpdateFabVisibility();
+
   function admetRenderList() {
     admetCountBadge.textContent = admetCompounds.length;
     admetListTitle.textContent = `${admetCompounds.length} compound${admetCompounds.length === 1 ? '' : 's'} added${admetCompounds.length < 5 ? ' (need ' + (5 - admetCompounds.length) + ' more to generate report)' : ''}`;
@@ -1926,27 +1994,37 @@
     if (!docxLib || !docxLib.Document) {
       throw new Error("The docx library failed to load. Please refresh the page and try again.");
     }
-    const {
-      Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-      AlignmentType, HeadingLevel, BorderStyle, WidthType, ShadingType, VerticalAlign
-    } = docxLib;
+    const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell } = docxLib;
 
-    const border = { style: BorderStyle.SINGLE, size: 4, color: "B7C4CC" };
+    // NOTE: docx's "enum" objects (BorderStyle, AlignmentType, etc.) are plain string constants
+    // under the hood. Some CDN/UMD builds of the docx package don't reliably expose every named
+    // export on the global object, which caused "Cannot read properties of undefined (reading
+    // 'SINGLE')" etc. Using the literal string values sidesteps that entirely — they're the exact
+    // same values the library would have used (e.g. BorderStyle.SINGLE === 'single').
+    const ALIGN_CENTER = 'center';
+    const ALIGN_LEFT = 'left';
+    const BORDER_SINGLE = 'single';
+    const WIDTH_DXA = 'dxa';
+    const SHADING_CLEAR = 'clear';
+    const VALIGN_CENTER = 'center';
+    const HEADING_2 = 'Heading2';
+
+    const border = { style: BORDER_SINGLE, size: 4, color: "B7C4CC" };
     const borders = { top: border, bottom: border, left: border, right: border };
-    const headerShade = { fill: "1F3245", type: ShadingType.CLEAR };
-    const labelShade = { fill: "EAF2EF", type: ShadingType.CLEAR };
+    const headerShade = { fill: "1F3245", type: SHADING_CLEAR };
+    const labelShade = { fill: "EAF2EF", type: SHADING_CLEAR };
 
     function cellText(text, opts = {}) {
       return new Paragraph({
-        alignment: opts.align || AlignmentType.CENTER,
+        alignment: opts.align || ALIGN_CENTER,
         children: [new TextRun({ text: text || '', bold: !!opts.bold, color: opts.color || "1A1A1A", size: opts.size || 18 })]
       });
     }
 
     function headCell(text, width) {
       return new TableCell({
-        borders, width: { size: width, type: WidthType.DXA }, shading: headerShade,
-        verticalAlign: VerticalAlign.CENTER,
+        borders, width: { size: width, type: WIDTH_DXA }, shading: headerShade,
+        verticalAlign: VALIGN_CENTER,
         margins: { top: 60, bottom: 60, left: 60, right: 60 },
         children: [cellText(text, { bold: true, color: "FFFFFF", size: 17 })]
       });
@@ -1954,17 +2032,17 @@
 
     function labelCell(text, width) {
       return new TableCell({
-        borders, width: { size: width, type: WidthType.DXA }, shading: labelShade,
-        verticalAlign: VerticalAlign.CENTER,
+        borders, width: { size: width, type: WIDTH_DXA }, shading: labelShade,
+        verticalAlign: VALIGN_CENTER,
         margins: { top: 50, bottom: 50, left: 70, right: 50 },
-        children: [cellText(text, { bold: true, align: AlignmentType.LEFT, size: 17 })]
+        children: [cellText(text, { bold: true, align: ALIGN_LEFT, size: 17 })]
       });
     }
 
     function dataCell(text, width) {
       return new TableCell({
-        borders, width: { size: width, type: WidthType.DXA },
-        verticalAlign: VerticalAlign.CENTER,
+        borders, width: { size: width, type: WIDTH_DXA },
+        verticalAlign: VALIGN_CENTER,
         margins: { top: 50, bottom: 50, left: 50, right: 50 },
         children: [cellText(text || '—', { size: 17, color: text ? "1A1A1A" : "9AA5AC" })]
       });
@@ -2046,7 +2124,7 @@
       });
 
       return new Table({
-        width: { size: CONTENT_WIDTH, type: WidthType.DXA },
+        width: { size: CONTENT_WIDTH, type: WIDTH_DXA },
         columnWidths,
         rows: [headerRow, ...bodyRows],
       });
@@ -2073,7 +2151,7 @@
       }));
 
       return new Table({
-        width: { size: CONTENT_WIDTH, type: WidthType.DXA },
+        width: { size: CONTENT_WIDTH, type: WIDTH_DXA },
         columnWidths,
         rows: [headerRow, ...bodyRows],
       });
@@ -2082,12 +2160,12 @@
     const children = [];
 
     children.push(new Paragraph({
-      alignment: AlignmentType.CENTER,
+      alignment: ALIGN_CENTER,
       children: [new TextRun({ text: "ADMET Properties of Selected Compounds", bold: true, size: 32, color: "0F1E2E" })],
       spacing: { after: 120 }
     }));
     children.push(new Paragraph({
-      alignment: AlignmentType.CENTER,
+      alignment: ALIGN_CENTER,
       children: [new TextRun({ text: `${admetCompounds.length} Compounds  |  SwissADME / pkCSM / ProTox-3.0 Analysis`, italics: true, size: 20, color: "5A6B7A" })],
       spacing: { after: 360 }
     }));
@@ -2100,7 +2178,7 @@
         : `Compound C${startIndex + 1}`;
 
       children.push(new Paragraph({
-        heading: HeadingLevel.HEADING_2,
+        heading: HEADING_2,
         children: [new TextRun({ text: pIdx === 0 ? "Table A: Physicochemical Properties of Selected Ligands" : "Table A (continued): Physicochemical Properties of Selected Ligands", bold: true, size: 24, color: "0F1E2E" })],
         spacing: { before: pIdx === 0 ? 0 : 480, after: 80 }
       }));
@@ -2119,7 +2197,7 @@
         : `Compound C${startIndex + 1}`;
 
       children.push(new Paragraph({
-        heading: HeadingLevel.HEADING_2,
+        heading: HEADING_2,
         children: [new TextRun({ text: pIdx === 0 ? "Table B: Toxicity Profile of Selected Compounds" : "Table B (continued): Toxicity Profile of Selected Compounds", bold: true, size: 24, color: "0F1E2E" })],
         spacing: { before: 480, after: 80 }
       }));
@@ -2144,7 +2222,7 @@
       })]
     }));
     children.push(new Paragraph({
-      alignment: AlignmentType.CENTER,
+      alignment: ALIGN_CENTER,
       children: [new TextRun({ text: "Generated via Drug Design Universe · Md Musfiqur Rahaman · Department of Pharmacy · Daffodil International University", size: 15, color: "8FA3B0" })],
       spacing: { before: 240 }
     }));
