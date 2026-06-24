@@ -9,7 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.js"></script>
 <style>
   :root {
     --bg: #0F1E2E;
@@ -1922,10 +1922,14 @@
   }
 
   function admetBuildDocx() {
+    const docxLib = window.docx || window;
+    if (!docxLib || !docxLib.Document) {
+      throw new Error("The docx library failed to load. Please refresh the page and try again.");
+    }
     const {
       Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
       AlignmentType, HeadingLevel, BorderStyle, WidthType, ShadingType, VerticalAlign
-    } = window.docx;
+    } = docxLib;
 
     const border = { style: BorderStyle.SINGLE, size: 4, color: "B7C4CC" };
     const borders = { top: border, bottom: border, left: border, right: border };
