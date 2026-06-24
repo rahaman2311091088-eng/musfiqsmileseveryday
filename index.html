@@ -9,6 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
 <style>
   :root {
     --bg: #0F1E2E;
@@ -587,6 +588,113 @@
 
   #appScreen { display: none; width: 100%; }
   #appScreen.active { display: flex; flex-direction: column; align-items: center; }
+
+  /* Main tab navigation */
+  .main-tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--bg-raised);
+    border: 1px solid var(--panel-line);
+    border-radius: 8px;
+    padding: 4px;
+    margin-bottom: 28px;
+    width: fit-content;
+  }
+  .main-tab {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 13.5px;
+    padding: 9px 18px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .main-tab.active { background: var(--accent); color: #0A1721; }
+  .main-tab:not(.active):hover { color: var(--text); }
+
+  .main-panel { display: none; width: 100%; flex-direction: column; align-items: center; }
+  .main-panel.active { display: flex; }
+
+  /* ADMET form */
+  .admet-section-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent-dim);
+    margin: 18px 0 10px;
+    padding-top: 14px;
+    border-top: 1px solid var(--panel-line);
+  }
+  .admet-field-row:first-of-type .admet-section-label,
+  .admet-field-row + .admet-section-label:first-child { border-top: none; padding-top: 0; }
+
+  .admet-field-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+  .admet-field-wide { grid-column: 1 / -1; }
+
+  .admet-field label {
+    display: block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 5px;
+  }
+  .admet-field input, .admet-field select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--panel-line);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 13.5px;
+    padding: 9px 11px;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .admet-field input:focus, .admet-field select:focus {
+    border-color: var(--accent-dim);
+    box-shadow: 0 0 0 3px rgba(127, 231, 196, 0.1);
+  }
+  .admet-field select { cursor: pointer; }
+
+  button#admetClearFormBtn {
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--panel-line);
+  }
+  button#admetClearFormBtn:hover { border-color: var(--slate); color: var(--text); }
+
+  button#admetGenerateBtn {
+    background: var(--amber);
+    color: #1A1106;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  button#admetGenerateBtn:hover { background: #F2B25C; }
+  button#admetGenerateBtn:disabled { background: var(--panel-line); color: var(--slate); cursor: not-allowed; }
+  button#admetGenerateBtn svg { width: 16px; height: 16px; }
+
+  .admet-row-remove {
+    background: none;
+    border: 1px solid var(--panel-line);
+    color: var(--error);
+    font-size: 11px;
+    padding: 5px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  .admet-row-remove:hover { border-color: var(--error); }
 </style>
 </head>
 <body>
@@ -636,6 +744,13 @@
   <div class="topbar">
     <div class="topbar-user">Signed in as <b id="userEmailLabel"></b><button id="signOutBtn">Sign out</button></div>
   </div>
+
+  <div class="main-tabs">
+    <button class="main-tab active" data-panel="pubchemTab">PubChem Lookup</button>
+    <button class="main-tab" data-panel="admetTab">ADMET Profiling</button>
+  </div>
+
+  <div id="pubchemTab" class="main-panel active">
   <div class="eyebrow">Live · PubChem PUG REST</div>
   <h1>Drug Design <span>Universe</span></h1>
   <p class="sub">Paste up to 50 PubChem Compound IDs or compound names — one per line, or comma-separated for simple names. Chemical names containing commas (e.g. <em>12-Oxododecanoic acid, ethyl ester</em>) are automatically detected and kept as a single entry.</p>
@@ -695,6 +810,141 @@
       </div>
     </div>
   </div>
+  </div>
+  <!-- /#pubchemTab -->
+
+  <div id="admetTab" class="main-panel">
+    <div class="eyebrow">Auto-fetch · SwissADME / ProTox-II · AI-powered</div>
+    <h1>ADMET <span>Profiling</span></h1>
+    <p class="sub">Paste a SMILES string and click <strong style="color:var(--accent)">Auto-fetch from SMILES</strong> — the AI will predict and fill in all SwissADME physicochemical properties and ProTox-II toxicity data automatically. You can still edit any field manually before adding to the report.</p>
+
+    <div class="console" id="admetFormCard">
+      <div class="console-label-row">
+        <div class="console-label">Add a compound</div>
+        <div class="count-badge"><b id="admetCountBadge">0</b> added</div>
+      </div>
+
+      <div class="admet-field-row">
+        <div class="admet-field admet-field-wide">
+          <label>Compound (CID or Name)</label>
+          <input type="text" id="admetCompoundId" placeholder="e.g. 2244 or Aspirin">
+        </div>
+      </div>
+
+      <div class="admet-field-row" style="margin-bottom:4px;">
+        <div class="admet-field" style="grid-column:1/-1; display:flex; flex-direction:column; gap:6px;">
+          <label>SMILES — paste here to auto-fill all fields</label>
+          <div style="display:flex; gap:10px; align-items:stretch;">
+            <input type="text" id="admetSmilesInput" placeholder="e.g. CC(=O)Oc1ccccc1C(=O)O" style="flex:1; font-family:&#39;IBM Plex Mono&#39;,monospace; font-size:12.5px; color:var(--amber);">
+            <button id="admetAutoFetchBtn" type="button" style="background:var(--accent);color:#0A1721;padding:9px 18px;font-size:13.5px;white-space:nowrap;flex-shrink:0;">&#9889; Auto-fetch ADME &amp; Toxicity</button>
+          </div>
+          <div id="admetFetchStatus" style="display:none; font-family:&#39;IBM Plex Mono&#39;,monospace; font-size:12px; color:var(--text-dim); padding:6px 0; white-space:pre-wrap;"></div>
+        </div>
+      </div>
+
+      <div class="admet-section-label">Physicochemical properties</div>
+      <div class="admet-field-row">
+        <div class="admet-field"><label>M.W. (g/mol)</label><input type="text" id="admet_mw" placeholder="180.16"></div>
+        <div class="admet-field"><label>Heavy atoms</label><input type="text" id="admet_heavyAtoms" placeholder="13"></div>
+        <div class="admet-field"><label>Arom. heavy atoms</label><input type="text" id="admet_aromAtoms" placeholder="6"></div>
+        <div class="admet-field"><label>Rotatable bonds</label><input type="text" id="admet_rotBonds" placeholder="2"></div>
+        <div class="admet-field"><label>H-bond acceptors</label><input type="text" id="admet_hAcceptors" placeholder="3"></div>
+        <div class="admet-field"><label>H-bond donors</label><input type="text" id="admet_hDonors" placeholder="1"></div>
+        <div class="admet-field"><label>Molar Refractivity</label><input type="text" id="admet_molarRef" placeholder="44.69"></div>
+      </div>
+
+      <div class="admet-section-label">Lipophilicity &amp; Water Solubility</div>
+      <div class="admet-field-row">
+        <div class="admet-field"><label>Log P o/w</label><input type="text" id="admet_logp" placeholder="1.31"></div>
+        <div class="admet-field"><label>Log S (ESOL)</label><input type="text" id="admet_logs" placeholder="-2.17"></div>
+      </div>
+
+      <div class="admet-section-label">Pharmacokinetics</div>
+      <div class="admet-field-row">
+        <div class="admet-field"><label>GI absorption</label>
+          <select id="admet_gi"><option value="">—</option><option>High</option><option>Low</option></select>
+        </div>
+        <div class="admet-field"><label>BBB permeant</label>
+          <select id="admet_bbb"><option value="">—</option><option>Yes</option><option>No</option></select>
+        </div>
+      </div>
+
+      <div class="admet-section-label">Drug-likeness</div>
+      <div class="admet-field-row">
+        <div class="admet-field"><label>Lipinski</label><input type="text" id="admet_lipinski" placeholder="Yes; 0 violation"></div>
+        <div class="admet-field"><label>Ghose</label><input type="text" id="admet_ghose" placeholder="Yes"></div>
+        <div class="admet-field"><label>Veber</label><input type="text" id="admet_veber" placeholder="Yes"></div>
+        <div class="admet-field"><label>Egan</label><input type="text" id="admet_egan" placeholder="Yes"></div>
+        <div class="admet-field"><label>Muegge</label><input type="text" id="admet_muegge" placeholder="Yes"></div>
+        <div class="admet-field"><label>Bioavailability Score</label><input type="text" id="admet_bioavail" placeholder="0.55"></div>
+      </div>
+
+      <div class="admet-section-label">Medicinal Chemistry</div>
+      <div class="admet-field-row">
+        <div class="admet-field"><label>Synthetic accessibility</label><input type="text" id="admet_synAccess" placeholder="2.32"></div>
+      </div>
+
+      <div class="admet-section-label">Toxicity Profile</div>
+      <div class="admet-field-row">
+        <div class="admet-field"><label>LD50 (mg/kg)</label><input type="text" id="admet_ld50" placeholder="250"></div>
+        <div class="admet-field"><label>Hepatotoxicity</label>
+          <select id="admet_hepato"><option value="">—</option><option>Active</option><option>Inactive</option></select>
+        </div>
+        <div class="admet-field"><label>Carcinogenicity</label>
+          <select id="admet_carcino"><option value="">—</option><option>Active</option><option>Inactive</option></select>
+        </div>
+        <div class="admet-field"><label>Immunotoxicity</label>
+          <select id="admet_immuno"><option value="">—</option><option>Active</option><option>Inactive</option></select>
+        </div>
+        <div class="admet-field"><label>Mutagenicity</label>
+          <select id="admet_mutagen"><option value="">—</option><option>Active</option><option>Inactive</option></select>
+        </div>
+        <div class="admet-field"><label>Cytotoxicity</label>
+          <select id="admet_cyto"><option value="">—</option><option>Active</option><option>Inactive</option></select>
+        </div>
+        <div class="admet-field"><label>Acute Oral Toxicity (GHS)</label>
+          <select id="admet_ghs"><option value="">—</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
+        </div>
+      </div>
+
+      <div class="console-actions">
+        <button id="admetAddBtn">Add compound</button>
+        <button id="admetClearFormBtn" type="button">Clear form</button>
+      </div>
+      <div class="auth-msg" id="admetFormMsg"></div>
+    </div>
+
+    <div class="results-wrap" id="admetListWrap" style="margin-top:28px;">
+      <div class="results-header">
+        <div class="results-title" id="admetListTitle">0 compounds added</div>
+        <div class="dl-btn-group">
+          <button id="admetGenerateBtn" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Generate Word report (.docx)
+          </button>
+        </div>
+      </div>
+      <div class="table-card">
+        <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Compound</th>
+              <th>M.W.</th>
+              <th>LogP</th>
+              <th>GI abs.</th>
+              <th>LD50</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="admetListBody"></tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- /#admetTab -->
 
   <footer>Data via <a href="https://pubchem.ncbi.nlm.nih.gov/" target="_blank" rel="noopener">PubChem</a>, National Library of Medicine</footer>
   <footer style="margin-top: 10px;">Created by <strong style="color: var(--text-dim);">Md Musfiqur Rahaman</strong> &middot; Department of Pharmacy &middot; Daffodil International University</footer>
@@ -870,6 +1120,18 @@
     } else {
       showAuth();
     }
+  });
+</script>
+
+<script>
+  // Main tab navigation (PubChem Lookup vs ADMET Profiling)
+  document.querySelectorAll('.main-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.main-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.main-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.panel).classList.add('active');
+    });
   });
 </script>
 
@@ -1299,6 +1561,528 @@
   });
 
   updateCount();
+</script>
+
+<script>
+  // ===== ADMET Profiling tab =====
+
+  const ADMET_FIELD_IDS = [
+    'admet_mw', 'admet_heavyAtoms', 'admet_aromAtoms', 'admet_rotBonds',
+    'admet_hAcceptors', 'admet_hDonors', 'admet_molarRef',
+    'admet_logp', 'admet_logs',
+    'admet_gi', 'admet_bbb',
+    'admet_lipinski', 'admet_ghose', 'admet_veber', 'admet_egan', 'admet_muegge', 'admet_bioavail',
+    'admet_synAccess',
+    'admet_ld50', 'admet_hepato', 'admet_carcino', 'admet_immuno', 'admet_mutagen', 'admet_cyto', 'admet_ghs'
+  ];
+
+  let admetCompounds = [];
+  let admetEditIndex = null; // if not null, "Add compound" instead edits this index
+
+  const admetCompoundIdInput = document.getElementById('admetCompoundId');
+  const admetAddBtn = document.getElementById('admetAddBtn');
+  const admetClearFormBtn = document.getElementById('admetClearFormBtn');
+  const admetFormMsg = document.getElementById('admetFormMsg');
+  const admetCountBadge = document.getElementById('admetCountBadge');
+  const admetListBody = document.getElementById('admetListBody');
+  const admetListTitle = document.getElementById('admetListTitle');
+  const admetGenerateBtn = document.getElementById('admetGenerateBtn');
+
+  function admetEscapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str == null ? '' : str;
+    return div.innerHTML;
+  }
+
+  function admetReadForm() {
+    const data = { compound: admetCompoundIdInput.value.trim() };
+    ADMET_FIELD_IDS.forEach(id => {
+      data[id] = document.getElementById(id).value.trim();
+    });
+    return data;
+  }
+
+  function admetFillForm(data) {
+    admetCompoundIdInput.value = data.compound || '';
+    ADMET_FIELD_IDS.forEach(id => {
+      document.getElementById(id).value = data[id] || '';
+    });
+  }
+
+  function admetClearForm() {
+    admetCompoundIdInput.value = '';
+    ADMET_FIELD_IDS.forEach(id => { document.getElementById(id).value = ''; });
+    admetEditIndex = null;
+    admetAddBtn.textContent = 'Add compound';
+    admetFormMsg.classList.remove('show');
+  }
+
+  function admetShowMsg(text, isError) {
+    admetFormMsg.textContent = text;
+    admetFormMsg.classList.add('show');
+    admetFormMsg.classList.toggle('error-msg', !!isError);
+    admetFormMsg.classList.toggle('success-msg', !isError);
+  }
+
+  admetAddBtn.addEventListener('click', () => {
+    const data = admetReadForm();
+    if (!data.compound) {
+      admetShowMsg('Enter a Compound ID or Name before adding.', true);
+      return;
+    }
+    if (admetEditIndex !== null) {
+      admetCompounds[admetEditIndex] = data;
+      admetShowMsg(`Updated compound #${admetEditIndex + 1}.`, false);
+    } else {
+      if (admetCompounds.length >= 60) {
+        admetShowMsg('You have reached the practical limit of 60 compounds for a single report.', true);
+        return;
+      }
+      admetCompounds.push(data);
+      admetShowMsg(`Added "${data.compound}" as compound #${admetCompounds.length}.`, false);
+    }
+    admetClearForm();
+    admetRenderList();
+  });
+
+  admetClearFormBtn.addEventListener('click', admetClearForm);
+
+  function admetRenderList() {
+    admetCountBadge.textContent = admetCompounds.length;
+    admetListTitle.textContent = `${admetCompounds.length} compound${admetCompounds.length === 1 ? '' : 's'} added`;
+    admetGenerateBtn.disabled = admetCompounds.length === 0;
+
+    admetListBody.innerHTML = admetCompounds.map((c, i) => `
+      <tr>
+        <td class="cid-cell">C${i + 1}</td>
+        <td class="name-cell" title="${admetEscapeHtml(c.compound)}">${admetEscapeHtml(c.compound)}</td>
+        <td class="formula-cell">${admetEscapeHtml(c.admet_mw) || '—'}</td>
+        <td class="formula-cell">${admetEscapeHtml(c.admet_logp) || '—'}</td>
+        <td class="formula-cell">${admetEscapeHtml(c.admet_gi) || '—'}</td>
+        <td class="formula-cell">${admetEscapeHtml(c.admet_ld50) || '—'}</td>
+        <td style="display:flex; gap:6px;">
+          <button class="sdf-link" data-action="edit" data-idx="${i}">Edit</button>
+          <button class="admet-row-remove" data-action="remove" data-idx="${i}">Remove</button>
+        </td>
+      </tr>
+    `).join('');
+
+    admetListBody.querySelectorAll('[data-action="edit"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx, 10);
+        admetEditIndex = idx;
+        admetFillForm(admetCompounds[idx]);
+        admetAddBtn.textContent = `Save changes to C${idx + 1}`;
+        admetFormMsg.classList.remove('show');
+        admetFormCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+    admetListBody.querySelectorAll('[data-action="remove"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx, 10);
+        admetCompounds.splice(idx, 1);
+        if (admetEditIndex === idx) admetClearForm();
+        admetRenderList();
+      });
+    });
+  }
+
+  // ---- Word document generation, replicating the ADMET template layout ----
+
+  function admetVal(c, id) {
+    const v = c[id];
+    return (v === undefined || v === null || v === '') ? '' : String(v);
+  }
+
+  function admetBuildDocx() {
+    const {
+      Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+      AlignmentType, HeadingLevel, BorderStyle, WidthType, ShadingType, VerticalAlign
+    } = window;
+
+    const border = { style: BorderStyle.SINGLE, size: 4, color: "B7C4CC" };
+    const borders = { top: border, bottom: border, left: border, right: border };
+    const headerShade = { fill: "1F3245", type: ShadingType.CLEAR };
+    const labelShade = { fill: "EAF2EF", type: ShadingType.CLEAR };
+
+    function cellText(text, opts = {}) {
+      return new Paragraph({
+        alignment: opts.align || AlignmentType.CENTER,
+        children: [new TextRun({ text: text || '', bold: !!opts.bold, color: opts.color || "1A1A1A", size: opts.size || 18 })]
+      });
+    }
+
+    function headCell(text, width) {
+      return new TableCell({
+        borders, width: { size: width, type: WidthType.DXA }, shading: headerShade,
+        verticalAlign: VerticalAlign.CENTER,
+        margins: { top: 60, bottom: 60, left: 60, right: 60 },
+        children: [cellText(text, { bold: true, color: "FFFFFF", size: 17 })]
+      });
+    }
+
+    function labelCell(text, width) {
+      return new TableCell({
+        borders, width: { size: width, type: WidthType.DXA }, shading: labelShade,
+        verticalAlign: VerticalAlign.CENTER,
+        margins: { top: 50, bottom: 50, left: 70, right: 50 },
+        children: [cellText(text, { bold: true, align: AlignmentType.LEFT, size: 17 })]
+      });
+    }
+
+    function dataCell(text, width) {
+      return new TableCell({
+        borders, width: { size: width, type: WidthType.DXA },
+        verticalAlign: VerticalAlign.CENTER,
+        margins: { top: 50, bottom: 50, left: 50, right: 50 },
+        children: [cellText(text || '—', { size: 17, color: text ? "1A1A1A" : "9AA5AC" })]
+      });
+    }
+
+    // Table A row groups: [groupLabel, [[fieldLabel, fieldId], ...]]
+    const tableARows = [
+      ['Physicochemical properties', [
+        ['M. W. (g/mol)', 'admet_mw'],
+        ['Heavy atoms', 'admet_heavyAtoms'],
+        ['Arom. heavy atoms', 'admet_aromAtoms'],
+        ['Rotatable bonds', 'admet_rotBonds'],
+        ['H-bond acceptors', 'admet_hAcceptors'],
+        ['H-bond donors', 'admet_hDonors'],
+        ['Molar Refractivity', 'admet_molarRef'],
+      ]],
+      ['Lipophilicity', [['Log P o/w', 'admet_logp']]],
+      ['Water Solubility', [['Log S (ESOL)', 'admet_logs']]],
+      ['Pharmacokinetics', [
+        ['GI absorption', 'admet_gi'],
+        ['BBB permeant', 'admet_bbb'],
+      ]],
+      ['Drug-likeness', [
+        ['Lipinski', 'admet_lipinski'],
+        ['Ghose', 'admet_ghose'],
+        ['Veber', 'admet_veber'],
+        ['Egan', 'admet_egan'],
+        ['Muegge', 'admet_muegge'],
+        ['Bioavailability Score', 'admet_bioavail'],
+      ]],
+      ['Med. Chemistry', [['Synthetic accessibility', 'admet_synAccess']]],
+    ];
+
+    const tableBCols = [
+      ['LD50', 'admet_ld50'],
+      ['Hepatotoxicity', 'admet_hepato'],
+      ['Carcinogenicity', 'admet_carcino'],
+      ['Immunotoxicity', 'admet_immuno'],
+      ['Mutagenicity', 'admet_mutagen'],
+      ['Cytotoxicity', 'admet_cyto'],
+      ['Acute Oral Toxicity', 'admet_ghs'],
+    ];
+
+    const PAGE_SIZE = 15; // compounds per table page, matching the original template's C1-C15 / C16-C30 split
+    const pages = [];
+    for (let i = 0; i < admetCompounds.length; i += PAGE_SIZE) {
+      pages.push(admetCompounds.slice(i, i + PAGE_SIZE));
+    }
+
+    const CONTENT_WIDTH = 13200; // landscape US Letter content width approx (DXA)
+    const LABEL_COL_W = 1500;
+    const ATTR_COL_W = 1700;
+
+    function buildTableAPage(pageCompounds, startIndex) {
+      const dataColW = Math.floor((CONTENT_WIDTH - LABEL_COL_W - ATTR_COL_W) / pageCompounds.length);
+      const columnWidths = [LABEL_COL_W, ATTR_COL_W, ...pageCompounds.map(() => dataColW)];
+
+      const headerRow = new TableRow({
+        tableHeader: true,
+        children: [
+          headCell('Properties', LABEL_COL_W),
+          headCell('Attributes', ATTR_COL_W),
+          ...pageCompounds.map((c, i) => headCell(`C${startIndex + i + 1}`, dataColW)),
+        ]
+      });
+
+      const bodyRows = [];
+      tableARows.forEach(([groupLabel, fields]) => {
+        fields.forEach(([fieldLabel, fieldId], fi) => {
+          bodyRows.push(new TableRow({
+            children: [
+              labelCell(fi === 0 ? groupLabel : '', LABEL_COL_W),
+              labelCell(fieldLabel, ATTR_COL_W),
+              ...pageCompounds.map(c => dataCell(admetVal(c, fieldId), dataColW)),
+            ]
+          }));
+        });
+      });
+
+      return new Table({
+        width: { size: CONTENT_WIDTH, type: WidthType.DXA },
+        columnWidths,
+        rows: [headerRow, ...bodyRows],
+      });
+    }
+
+    function buildTableBPage(pageCompounds, startIndex) {
+      const nameColW = 2400;
+      const dataColW = Math.floor((CONTENT_WIDTH - nameColW) / tableBCols.length);
+      const columnWidths = [nameColW, ...tableBCols.map(() => dataColW)];
+
+      const headerRow = new TableRow({
+        tableHeader: true,
+        children: [
+          headCell('Compound (CID / Name)', nameColW),
+          ...tableBCols.map(([label]) => headCell(label, dataColW)),
+        ]
+      });
+
+      const bodyRows = pageCompounds.map((c, i) => new TableRow({
+        children: [
+          labelCell(`C${startIndex + i + 1} — ${c.compound}`, nameColW),
+          ...tableBCols.map(([, fieldId]) => dataCell(admetVal(c, fieldId), dataColW)),
+        ]
+      }));
+
+      return new Table({
+        width: { size: CONTENT_WIDTH, type: WidthType.DXA },
+        columnWidths,
+        rows: [headerRow, ...bodyRows],
+      });
+    }
+
+    const children = [];
+
+    children.push(new Paragraph({
+      alignment: AlignmentType.CENTER,
+      children: [new TextRun({ text: "ADMET Properties of Selected Compounds", bold: true, size: 32, color: "0F1E2E" })],
+      spacing: { after: 120 }
+    }));
+    children.push(new Paragraph({
+      alignment: AlignmentType.CENTER,
+      children: [new TextRun({ text: `${admetCompounds.length} Compounds  |  SwissADME / pkCSM / ProTox-3.0 Analysis`, italics: true, size: 20, color: "5A6B7A" })],
+      spacing: { after: 360 }
+    }));
+
+    // Table A pages
+    pages.forEach((pageCompounds, pIdx) => {
+      const startIndex = pIdx * PAGE_SIZE;
+      const rangeLabel = pageCompounds.length > 1
+        ? `Compounds C${startIndex + 1} – C${startIndex + pageCompounds.length}`
+        : `Compound C${startIndex + 1}`;
+
+      children.push(new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        children: [new TextRun({ text: pIdx === 0 ? "Table A: Physicochemical Properties of Selected Ligands" : "Table A (continued): Physicochemical Properties of Selected Ligands", bold: true, size: 24, color: "0F1E2E" })],
+        spacing: { before: pIdx === 0 ? 0 : 480, after: 80 }
+      }));
+      children.push(new Paragraph({
+        children: [new TextRun({ text: rangeLabel, italics: true, size: 19, color: "5A6B7A" })],
+        spacing: { after: 160 }
+      }));
+      children.push(buildTableAPage(pageCompounds, startIndex));
+    });
+
+    // Table B pages
+    pages.forEach((pageCompounds, pIdx) => {
+      const startIndex = pIdx * PAGE_SIZE;
+      const rangeLabel = pageCompounds.length > 1
+        ? `Compounds C${startIndex + 1} – C${startIndex + pageCompounds.length}`
+        : `Compound C${startIndex + 1}`;
+
+      children.push(new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        children: [new TextRun({ text: pIdx === 0 ? "Table B: Toxicity Profile of Selected Compounds" : "Table B (continued): Toxicity Profile of Selected Compounds", bold: true, size: 24, color: "0F1E2E" })],
+        spacing: { before: 480, after: 80 }
+      }));
+      children.push(new Paragraph({
+        children: [new TextRun({ text: rangeLabel, italics: true, size: 19, color: "5A6B7A" })],
+        spacing: { after: 160 }
+      }));
+      children.push(buildTableBPage(pageCompounds, startIndex));
+    });
+
+    children.push(new Paragraph({
+      children: [new TextRun({
+        text: "Abbreviations: M.W. = Molecular Weight; Arom. = Aromatic; H-bond = Hydrogen bond; GI = Gastrointestinal; BBB = Blood-Brain Barrier; Log P = Partition coefficient (lipophilicity); Log S = Aqueous solubility; LD50 = Lethal Dose 50%; GHS = Globally Harmonized System.",
+        italics: true, size: 15, color: "5A6B7A"
+      })],
+      spacing: { before: 480, after: 60 }
+    }));
+    children.push(new Paragraph({
+      children: [new TextRun({
+        text: "Sources: SwissADME (swissadme.ch) for physicochemical/ADME properties; pkCSM or ProTox-3.0 for toxicity prediction. Values entered manually by the user.",
+        italics: true, size: 15, color: "5A6B7A"
+      })]
+    }));
+    children.push(new Paragraph({
+      alignment: AlignmentType.CENTER,
+      children: [new TextRun({ text: "Generated via Drug Design Universe · Md Musfiqur Rahaman · Department of Pharmacy · Daffodil International University", size: 15, color: "8FA3B0" })],
+      spacing: { before: 240 }
+    }));
+
+    const doc = new Document({
+      styles: {
+        default: { document: { run: { font: "Calibri", size: 20 } } },
+        paragraphStyles: [
+          { id: "Heading2", name: "Heading 2", basedOn: "Normal", next: "Normal", quickFormat: true,
+            run: { size: 24, bold: true, font: "Calibri" },
+            paragraph: { spacing: { before: 240, after: 120 }, outlineLevel: 1 } },
+        ]
+      },
+      sections: [{
+        properties: {
+          page: {
+            size: { width: 15840, height: 12240, orientation: "landscape" },
+            margin: { top: 720, right: 720, bottom: 720, left: 720 }
+          }
+        },
+        children
+      }]
+    });
+
+    return Packer.toBlob(doc);
+  }
+
+  admetGenerateBtn.addEventListener('click', async () => {
+    if (admetCompounds.length === 0) return;
+    admetGenerateBtn.disabled = true;
+    const originalLabel = admetGenerateBtn.innerHTML;
+    admetGenerateBtn.textContent = 'Building document…';
+    try {
+      const blob = await admetBuildDocx();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const stamp = new Date().toISOString().slice(0, 10);
+      a.download = `ADMET-Profile-${admetCompounds.length}-compounds-${stamp}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      admetShowMsg('Could not generate the document: ' + err.message, true);
+    } finally {
+      admetGenerateBtn.innerHTML = originalLabel;
+      admetGenerateBtn.disabled = admetCompounds.length === 0;
+    }
+  });
+
+  admetRenderList();
+  // ===== SMILES Auto-fetch logic =====
+  const admetAutoFetchBtn = document.getElementById('admetAutoFetchBtn');
+  const admetSmilesInput = document.getElementById('admetSmilesInput');
+  const admetFetchStatus = document.getElementById('admetFetchStatus');
+
+  function setFetchStatus(msg, color) {
+    admetFetchStatus.style.display = msg ? 'block' : 'none';
+    admetFetchStatus.textContent = msg;
+    admetFetchStatus.style.color = color || 'var(--text-dim)';
+  }
+
+  admetAutoFetchBtn.addEventListener('click', async () => {
+    const smiles = admetSmilesInput.value.trim();
+    if (!smiles) {
+      setFetchStatus('Please paste a SMILES string first.', 'var(--error)');
+      return;
+    }
+    admetAutoFetchBtn.disabled = true;
+    admetAutoFetchBtn.textContent = '⏳ Fetching…';
+    setFetchStatus('Querying AI for ADME & toxicity data — this takes ~10s…', 'var(--text-dim)');
+
+    const prompt = `You are a computational pharmacology expert. Given the SMILES: ${smiles}
+
+Calculate and return the following as a JSON object (no markdown, no extra text, only raw JSON):
+
+{
+  "admet_mw": "<molecular weight in g/mol, 2 decimal places>",
+  "admet_heavyAtoms": "<count of heavy atoms>",
+  "admet_aromAtoms": "<count of aromatic heavy atoms>",
+  "admet_rotBonds": "<count of rotatable bonds>",
+  "admet_hAcceptors": "<count of H-bond acceptors>",
+  "admet_hDonors": "<count of H-bond donors>",
+  "admet_molarRef": "<molar refractivity, 2 decimal places>",
+  "admet_logp": "<consensus iLogP value, 2 decimal places>",
+  "admet_logs": "<ESOL log S value, 2 decimal places>",
+  "admet_gi": "<'High' or 'Low' GI absorption>",
+  "admet_bbb": "<'Yes' or 'No' for BBB permeant>",
+  "admet_lipinski": "<'Yes; 0 violation' or 'No; X violations' format>",
+  "admet_ghose": "<'Yes' or 'No'>",
+  "admet_veber": "<'Yes' or 'No'>",
+  "admet_egan": "<'Yes' or 'No'>",
+  "admet_muegge": "<'Yes' or 'No'>",
+  "admet_bioavail": "<bioavailability score like 0.55>",
+  "admet_synAccess": "<synthetic accessibility score 1-10, 2 decimal places>",
+  "admet_ld50": "<predicted LD50 in mg/kg as integer>",
+  "admet_hepato": "<'Active' or 'Inactive'>",
+  "admet_carcino": "<'Active' or 'Inactive'>",
+  "admet_immuno": "<'Active' or 'Inactive'>",
+  "admet_mutagen": "<'Active' or 'Inactive'>",
+  "admet_cyto": "<'Active' or 'Inactive'>",
+  "admet_ghs": "<GHS acute oral toxicity category: 1, 2, 3, 4, or 5>"
+}
+
+Use established cheminformatics rules (RDKit-equivalent calculations, Lipinski RO5, Ghose, Veber, Egan, Muegge filters). For toxicity use ProTox-II-style predictions. Return ONLY the JSON, no explanation.`;
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1000,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('API error: ' + response.status);
+      }
+
+      const data = await response.json();
+      const raw = (data.content || []).map(b => b.text || '').join('');
+      const clean = raw.replace(/```json|```/g, '').trim();
+      let parsed;
+      try {
+        parsed = JSON.parse(clean);
+      } catch(e) {
+        throw new Error('Could not parse AI response. Try again.');
+      }
+
+      // Fill in all form fields
+      const fieldMap = [
+        'admet_mw','admet_heavyAtoms','admet_aromAtoms','admet_rotBonds',
+        'admet_hAcceptors','admet_hDonors','admet_molarRef','admet_logp',
+        'admet_logs','admet_gi','admet_bbb','admet_lipinski','admet_ghose',
+        'admet_veber','admet_egan','admet_muegge','admet_bioavail',
+        'admet_synAccess','admet_ld50','admet_hepato','admet_carcino',
+        'admet_immuno','admet_mutagen','admet_cyto','admet_ghs'
+      ];
+      let filled = 0;
+      fieldMap.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const val = parsed[id];
+        if (val !== undefined && val !== null && val !== '') {
+          if (el.tagName === 'SELECT') {
+            // Try to match option
+            const opts = Array.from(el.options).map(o => o.value);
+            const match = opts.find(o => o.toLowerCase() === String(val).toLowerCase());
+            if (match !== undefined) { el.value = match; filled++; }
+            else { el.value = val; filled++; }
+          } else {
+            el.value = val;
+            filled++;
+          }
+        }
+      });
+
+      setFetchStatus('✓ Auto-filled ' + filled + '/25 fields from SMILES. Review and edit if needed, then click "Add compound".', 'var(--accent)');
+
+    } catch(err) {
+      setFetchStatus('Error: ' + err.message, 'var(--error)');
+    } finally {
+      admetAutoFetchBtn.disabled = false;
+      admetAutoFetchBtn.textContent = '⚡ Auto-fetch ADME & Toxicity';
+    }
+  });
+
 </script>
 
 </body>
