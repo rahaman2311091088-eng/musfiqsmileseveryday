@@ -797,6 +797,47 @@
     grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   }
 
+  /* History */
+  .history-card {
+    background: var(--bg-raised);
+    border: 1px solid var(--panel-line);
+    border-radius: 8px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .history-card:hover { border-color: var(--accent-dim); }
+  .history-card-meta { flex: 1; min-width: 0; }
+  .history-card-name {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: var(--accent);
+    font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .history-card-sub {
+    font-size: 11.5px;
+    color: var(--text-dim);
+    margin-top: 3px;
+  }
+  .history-card-actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .history-load-btn {
+    background: var(--accent-dim); color: #0A1721;
+    border: none; border-radius: 5px; padding: 6px 14px;
+    font-size: 12.5px; font-weight: 600; cursor: pointer;
+  }
+  .history-load-btn:hover { background: var(--accent); }
+  .history-del-btn {
+    background: transparent; color: var(--error);
+    border: 1px solid var(--error); border-radius: 5px; padding: 6px 12px;
+    font-size: 12.5px; font-weight: 600; cursor: pointer;
+  }
+  .history-del-btn:hover { background: rgba(232,101,74,0.1); }
+
+
 </style>
 </head>
 <body>
@@ -1092,6 +1133,21 @@
         </div>
       </div>
     </div>
+
+    <!-- ADMET Session History -->
+    <div id="admetHistorySection" style="margin-top:36px; display:none;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:var(--slate);">
+          ● Saved Sessions
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="text" id="historySessionName" placeholder="Session name (optional)" style="background:var(--bg); border:1px solid var(--panel-line); border-radius:5px; color:var(--text); font-family:'Inter',sans-serif; font-size:13px; padding:7px 12px; outline:none; width:220px;">
+          <button id="historySaveBtn" style="background:var(--accent); color:#0A1721; font-size:13px; padding:8px 16px; border-radius:6px; border:none; cursor:pointer; font-weight:600;">Save current session</button>
+        </div>
+      </div>
+      <div id="historyMsg" style="font-size:12.5px; margin-bottom:8px; display:none;"></div>
+      <div id="historyList" style="display:flex; flex-direction:column; gap:8px;"></div>
+    </div>
   </div>
   <!-- /#admetTab -->
 
@@ -1240,10 +1296,14 @@
     }
   }
 
+  let currentUser = null;
+
   function showApp(user) {
+    currentUser = user;
     authScreen.style.display = 'none';
     appScreen.classList.add('active');
     userEmailLabel.textContent = (user.email === GUEST_EMAIL) ? 'Guest' : user.email;
+    if (typeof admetHistoryLoad === 'function') admetHistoryLoad();
   }
 
   function showAuth() {
@@ -1865,7 +1925,7 @@
     const {
       Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
       AlignmentType, HeadingLevel, BorderStyle, WidthType, ShadingType, VerticalAlign
-    } = window;
+    } = window.docx;
 
     const border = { style: BorderStyle.SINGLE, size: 4, color: "B7C4CC" };
     const borders = { top: border, bottom: border, left: border, right: border };
@@ -2454,6 +2514,137 @@
       delete cidInput.dataset.autoFilled;
     });
   })();
+
+  // ── ADMET Session History (Supabase) ────────────────────────────────
+  const HISTORY_TABLE = 'admet_sessions';
+
+  const historySection   = document.getElementById('admetHistorySection');
+  const historySaveBtn   = document.getElementById('historySaveBtn');
+  const historySessionNameInput = document.getElementById('historySessionName');
+  const historyList      = document.getElementById('historyList');
+  const historyMsg       = document.getElementById('historyMsg');
+
+  function historyShowMsg(msg, isError) {
+    historyMsg.textContent = msg;
+    historyMsg.style.color = isError ? 'var(--error)' : 'var(--accent)';
+    historyMsg.style.display = '';
+    clearTimeout(historyMsg._t);
+    historyMsg._t = setTimeout(() => { historyMsg.style.display = 'none'; }, 4000);
+  }
+
+  async function admetHistoryLoad() {
+    if (!currentUser) return;
+    historySection.style.display = '';
+
+    const { data, error } = await supabaseClient
+      .from(HISTORY_TABLE)
+      .select('id, name, compound_count, saved_at')
+      .eq('user_id', currentUser.id)
+      .order('saved_at', { ascending: false })
+      .limit(20);
+
+    if (error) {
+      historyList.innerHTML = `<div style="color:var(--error);font-size:12.5px;">Could not load history: ${error.message}</div>`;
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      historyList.innerHTML = '<div style="color:var(--text-dim);font-size:12.5px;">No saved sessions yet.</div>';
+      return;
+    }
+
+    historyList.innerHTML = data.map(row => {
+      const date = new Date(row.saved_at).toLocaleString();
+      return `
+        <div class="history-card" data-id="${row.id}">
+          <div class="history-card-meta">
+            <div class="history-card-name">${row.name || 'Untitled Session'}</div>
+            <div class="history-card-sub">${row.compound_count} compound${row.compound_count !== 1 ? 's' : ''} &middot; ${date}</div>
+          </div>
+          <div class="history-card-actions">
+            <button class="history-load-btn" data-id="${row.id}">Load</button>
+            <button class="history-del-btn" data-id="${row.id}">Delete</button>
+          </div>
+        </div>`;
+    }).join('');
+
+    historyList.querySelectorAll('.history-load-btn').forEach(btn => {
+      btn.addEventListener('click', () => admetHistoryLoadSession(btn.dataset.id));
+    });
+    historyList.querySelectorAll('.history-del-btn').forEach(btn => {
+      btn.addEventListener('click', () => admetHistoryDelete(btn.dataset.id));
+    });
+  }
+
+  async function admetHistoryLoadSession(id) {
+    const { data, error } = await supabaseClient
+      .from(HISTORY_TABLE)
+      .select('compounds')
+      .eq('id', id)
+      .single();
+
+    if (error || !data) {
+      historyShowMsg('Failed to load session.', true);
+      return;
+    }
+    try {
+      const compounds = JSON.parse(data.compounds);
+      if (!Array.isArray(compounds) || compounds.length === 0) throw new Error('Empty');
+      admetCompounds = compounds;
+      admetClearForm();
+      admetRenderList();
+      historyShowMsg(`Loaded ${compounds.length} compound${compounds.length !== 1 ? 's' : ''} into the form.`, false);
+      document.getElementById('admetFormCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (e) {
+      historyShowMsg('Session data is corrupted.', true);
+    }
+  }
+
+  async function admetHistoryDelete(id) {
+    if (!confirm('Delete this saved session?')) return;
+    const { error } = await supabaseClient
+      .from(HISTORY_TABLE)
+      .delete()
+      .eq('id', id)
+      .eq('user_id', currentUser.id);
+
+    if (error) { historyShowMsg('Delete failed: ' + error.message, true); return; }
+    historyShowMsg('Session deleted.', false);
+    admetHistoryLoad();
+  }
+
+  historySaveBtn.addEventListener('click', async () => {
+    if (!currentUser) { historyShowMsg('Sign in to save sessions.', true); return; }
+    if (admetCompounds.length === 0) { historyShowMsg('Add at least one compound before saving.', true); return; }
+
+    const name = historySessionNameInput.value.trim() ||
+      `Session – ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
+
+    historySaveBtn.disabled = true;
+    historySaveBtn.textContent = 'Saving…';
+
+    const { error } = await supabaseClient
+      .from(HISTORY_TABLE)
+      .insert({
+        user_id: currentUser.id,
+        name,
+        compound_count: admetCompounds.length,
+        compounds: JSON.stringify(admetCompounds),
+        saved_at: new Date().toISOString()
+      });
+
+    historySaveBtn.disabled = false;
+    historySaveBtn.textContent = 'Save current session';
+
+    if (error) {
+      historyShowMsg('Save failed: ' + error.message, true);
+    } else {
+      historySessionNameInput.value = '';
+      historyShowMsg(`Session "${name}" saved!`, false);
+      admetHistoryLoad();
+    }
+  });
+
 
 </script>
 
