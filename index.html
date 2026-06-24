@@ -242,6 +242,34 @@
   button#downloadBtn:disabled { background: var(--panel-line); color: var(--slate); cursor: not-allowed; }
   button#downloadBtn svg { width: 16px; height: 16px; }
 
+  button#downloadSdfBtn {
+    background: transparent;
+    border: 1px solid var(--accent-dim);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  button#downloadSdfBtn:hover { background: rgba(127, 231, 196, 0.08); }
+  button#downloadSdfBtn:disabled { background: transparent; border-color: var(--panel-line); color: var(--slate); cursor: not-allowed; }
+  button#downloadSdfBtn svg { width: 16px; height: 16px; }
+
+  .sdf-link {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    color: var(--accent-dim);
+    background: none;
+    border: 1px solid var(--panel-line);
+    border-radius: 5px;
+    padding: 5px 9px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  .sdf-link:hover { border-color: var(--accent-dim); color: var(--accent); }
+  .sdf-link:disabled { opacity: 0.4; cursor: not-allowed; }
+  .sdf-link.loading { color: var(--amber); }
+
   .table-card {
     background: var(--bg-raised);
     border: 1px solid var(--panel-line);
@@ -541,10 +569,16 @@
   <div class="results-wrap" id="resultsWrap">
     <div class="results-header">
       <div class="results-title" id="resultsTitle"></div>
-      <button id="downloadBtn" disabled>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-        Download spreadsheet (.xlsx)
-      </button>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button id="downloadSdfBtn" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path></svg>
+          Download 3D SDF (all)
+        </button>
+        <button id="downloadBtn" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Download spreadsheet (.xlsx)
+        </button>
+      </div>
     </div>
     <div class="table-card">
       <table>
@@ -556,6 +590,7 @@
             <th>Formula</th>
             <th>MW</th>
             <th>SMILES</th>
+            <th>3D SDF</th>
           </tr>
         </thead>
         <tbody id="resultsBody"></tbody>
@@ -758,6 +793,7 @@
   const resultsTitle = document.getElementById('resultsTitle');
   const resultsBody = document.getElementById('resultsBody');
   const downloadBtn = document.getElementById('downloadBtn');
+  const downloadSdfBtn = document.getElementById('downloadSdfBtn');
 
   let lastResults = [];
 
@@ -766,6 +802,87 @@
     div.textContent = str;
     return div.innerHTML;
   }
+
+  function triggerDownload(filename, content) {
+    const blob = new Blob([content], { type: 'chemical/x-mdl-sdfile' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function sanitizeFilename(name) {
+    return (name || 'molecule').replace(/[^a-z0-9_\-]+/gi, '_').slice(0, 60);
+  }
+
+  async function fetchSdf3d(cid) {
+    const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/record/SDF?record_type=3d`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('no-3d');
+    const text = await res.text();
+    if (!text || text.trim().length === 0) throw new Error('empty');
+    return text;
+  }
+
+  async function downloadSingleSdf(cid, name, btnEl) {
+    const originalLabel = btnEl.textContent;
+    btnEl.disabled = true;
+    btnEl.textContent = '…';
+    btnEl.classList.add('loading');
+    try {
+      const sdf = await fetchSdf3d(cid);
+      triggerDownload(`${sanitizeFilename(name)}_CID${cid}_3D.sdf`, sdf);
+      btnEl.textContent = '✓';
+    } catch (err) {
+      btnEl.textContent = 'No 3D';
+      setTimeout(() => { btnEl.textContent = originalLabel; }, 1800);
+    } finally {
+      btnEl.classList.remove('loading');
+      setTimeout(() => { btnEl.disabled = false; if (btnEl.textContent === '✓') btnEl.textContent = originalLabel; }, 1800);
+    }
+  }
+
+  async function downloadBulkSdf() {
+    if (!lastResults.length) return;
+    const okRows = lastResults.filter(r => !r.error);
+    if (okRows.length === 0) return;
+
+    downloadSdfBtn.disabled = true;
+    const originalLabel = downloadSdfBtn.innerHTML;
+    let collected = [];
+    let missing = [];
+
+    for (let i = 0; i < okRows.length; i++) {
+      const r = okRows[i];
+      downloadSdfBtn.textContent = `Fetching 3D… ${i + 1}/${okRows.length}`;
+      try {
+        const sdf = await fetchSdf3d(r.cid);
+        collected.push(sdf.trim().endsWith('$$$$') ? sdf : sdf + '\n$$$$\n');
+      } catch (err) {
+        missing.push(r.name || r.cid);
+      }
+    }
+
+    downloadSdfBtn.innerHTML = originalLabel;
+    downloadSdfBtn.disabled = false;
+
+    if (collected.length === 0) {
+      showState('No 3D conformer data was available for any compound in this set.', true);
+      return;
+    }
+
+    triggerDownload(`pubchem-3d-conformers-${new Date().toISOString().slice(0, 10)}.sdf`, collected.join('\n'));
+
+    if (missing.length > 0) {
+      showState(`Downloaded ${collected.length} of ${okRows.length} 3D structures. No 3D model available for: ${missing.join(', ')}.`, false);
+    }
+  }
+
+  downloadSdfBtn.addEventListener('click', downloadBulkSdf);
 
   function parseEntries(raw) {
     return raw
@@ -942,7 +1059,7 @@
           <tr class="row-error">
             <td class="struct-cell"><div class="mini-struct"><span style="font-size:9px;color:#ccc;font-family:'IBM Plex Mono',monospace;">N/A</span></div></td>
             <td class="cid-cell">${escapeHtml(r.cid)}</td>
-            <td class="name-cell" colspan="4"><span class="smiles-cell is-error">${escapeHtml(r.error)}</span></td>
+            <td class="name-cell" colspan="5"><span class="smiles-cell is-error">${escapeHtml(r.error)}</span></td>
           </tr>`;
       }
       const imgUrl = `https://pubchem.ncbi.nlm.nih.gov/image/imgsrv.fcgi?cid=${r.cid}&t=l`;
@@ -958,11 +1075,17 @@
           <td class="formula-cell">${escapeHtml(r.formula)}</td>
           <td class="formula-cell">${escapeHtml(r.weight)}</td>
           <td class="smiles-cell" title="${escapeHtml(r.smiles)}">${escapeHtml(r.smiles)}</td>
+          <td><button class="sdf-link" data-cid="${escapeHtml(r.cid)}" data-name="${escapeHtml(r.name)}">Download</button></td>
         </tr>`;
     }).join('');
 
+    resultsBody.querySelectorAll('.sdf-link').forEach(btn => {
+      btn.addEventListener('click', () => downloadSingleSdf(btn.dataset.cid, btn.dataset.name, btn));
+    });
+
     resultsWrap.classList.add('active');
     downloadBtn.disabled = results.every(r => r.error);
+    downloadSdfBtn.disabled = results.every(r => r.error);
   }
 
   downloadBtn.addEventListener('click', () => {
