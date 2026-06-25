@@ -134,75 +134,132 @@ body {
 #landingPage {
   position: relative; z-index: 1;
   min-height: 100vh; display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  padding: 40px 24px;
+  align-items: center; justify-content: flex-start;
+  padding: 0 24px 40px;
   transition: opacity 0.5s ease, transform 0.5s ease;
+  overflow-x: hidden;
+}
+#landingPage.exiting { opacity: 0; transform: translateY(-30px) scale(0.98); }
+
+/* ── Floating Particles ── */
+.landing-particles { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; overflow: hidden; }
+.landing-particle {
+  position: absolute; border-radius: 50%;
+  background: radial-gradient(circle, rgba(127,231,196,0.3), transparent 70%);
+  animation: particleFloat linear infinite;
+}
+@keyframes particleFloat {
+  0% { transform: translateY(100vh) scale(0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(-10vh) scale(1); opacity: 0; }
 }
 
-#landingPage.exiting {
-  opacity: 0; transform: translateY(-30px) scale(0.98);
+/* ── Cursor Glow ── */
+.cursor-glow {
+  position: fixed; width: 600px; height: 600px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(127,231,196,0.04) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+  transform: translate(-50%, -50%);
+  transition: left 0.3s ease-out, top 0.3s ease-out;
 }
 
+/* ── Animated Gradient BG ── */
+.landing-gradient-bg {
+  position: fixed; top: -50%; left: -50%; width: 200%; height: 200%;
+  background: conic-gradient(from 0deg at 50% 50%,
+    rgba(127,231,196,0.03), rgba(56,189,248,0.03), rgba(168,85,247,0.02),
+    rgba(127,231,196,0.03));
+  animation: gradientSpin 20s linear infinite;
+  z-index: 0; pointer-events: none;
+}
+@keyframes gradientSpin { to { transform: rotate(360deg); } }
+
+/* ── Staggered Reveal ── */
+.reveal { opacity: 0; transform: translateY(30px); transition: opacity 0.7s ease, transform 0.7s ease; }
+.reveal.visible { opacity: 1; transform: translateY(0); }
+.reveal-d1 { transition-delay: 0.1s; } .reveal-d2 { transition-delay: 0.2s; }
+.reveal-d3 { transition-delay: 0.3s; } .reveal-d4 { transition-delay: 0.4s; }
+.reveal-d5 { transition-delay: 0.5s; } .reveal-d6 { transition-delay: 0.6s; }
+
+/* ── Badge ── */
 .landing-badge {
   display: inline-flex; align-items: center; gap: 8px;
-  background: rgba(127,231,196,0.08); border: 1px solid rgba(127,231,196,0.15);
+  background: rgba(127,231,196,0.06); border: 1px solid rgba(127,231,196,0.12);
   border-radius: 100px; padding: 8px 18px;
   font-family: var(--font-mono); font-size: 12px; color: var(--accent);
   letter-spacing: 0.06em; margin-bottom: 28px;
   animation: fadeUp 0.6s ease-out both;
 }
-
 .landing-badge .dot {
   width: 6px; height: 6px; border-radius: 50%;
   background: var(--accent); box-shadow: 0 0 8px var(--accent);
   animation: pulse 2s ease-in-out infinite;
 }
-
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
 @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
+/* ── SPLIT HERO ── */
+.landing-hero {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 60px;
+  align-items: center; max-width: 1200px; width: 100%;
+  padding: 80px 0 60px; position: relative; z-index: 1;
+}
+.hero-left { display: flex; flex-direction: column; }
+.hero-right { display: flex; align-items: center; justify-content: center; position: relative; }
+
 .landing-title {
-  font-family: var(--font-mono); font-size: clamp(36px, 6vw, 56px);
-  font-weight: 700; text-align: center; line-height: 1.1;
+  font-family: var(--font-mono); font-size: clamp(32px, 4.5vw, 52px);
+  font-weight: 700; line-height: 1.08;
   letter-spacing: -0.03em; margin-bottom: 20px;
   animation: fadeUp 0.6s 0.1s ease-out both;
 }
-
 .landing-title .gradient {
-  background: linear-gradient(135deg, var(--accent), #B8F0D8, var(--amber));
+  background: linear-gradient(135deg, var(--accent), #67E8F9, var(--accent));
+  background-size: 200% 200%;
   -webkit-background-clip: text; -webkit-text-fill-color: transparent;
   background-clip: text;
+  animation: gradientShift 4s ease infinite;
 }
+@keyframes gradientShift { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
 
 .landing-subtitle {
-  font-size: clamp(15px, 2vw, 18px); color: var(--text-dim);
-  text-align: center; max-width: 600px; line-height: 1.65;
-  margin-bottom: 36px;
+  font-size: clamp(14px, 1.8vw, 17px); color: var(--text-dim);
+  max-width: 480px; line-height: 1.7; margin-bottom: 32px;
   animation: fadeUp 0.6s 0.2s ease-out both;
 }
 
 .landing-actions {
-  display: flex; gap: 14px; flex-wrap: wrap; justify-content: center;
-  margin-bottom: 48px;
+  display: flex; gap: 14px; flex-wrap: wrap;
+  margin-bottom: 32px;
   animation: fadeUp 0.6s 0.3s ease-out both;
 }
 
+/* ── Magnetic Buttons ── */
+.btn-primary, .btn-secondary {
+  position: relative; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
 .btn-primary {
   display: inline-flex; align-items: center; gap: 8px;
   background: var(--accent); color: #06120E;
   font-family: var(--font-sans); font-weight: 700; font-size: 15px;
   padding: 14px 28px; border: none; border-radius: var(--radius-md);
-  cursor: pointer; position: relative; overflow: hidden;
-  transition: all var(--transition-fast);
-  box-shadow: 0 0 20px rgba(127,231,196,0.2), 0 4px 12px rgba(0,0,0,0.2);
+  cursor: pointer; overflow: hidden;
+  box-shadow: 0 0 24px rgba(127,231,196,0.15), 0 4px 16px rgba(0,0,0,0.2);
 }
-
 .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 0 30px rgba(127,231,196,0.3), 0 8px 24px rgba(0,0,0,0.25);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 0 40px rgba(127,231,196,0.25), 0 8px 32px rgba(0,0,0,0.25);
 }
-
 .btn-primary:active { transform: translateY(0) scale(0.98); }
+.btn-primary::after {
+  content: ''; position: absolute; top: 50%; left: 50%;
+  width: 0; height: 0; border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  transform: translate(-50%, -50%);
+  transition: width 0.5s, height 0.5s;
+}
+.btn-primary:hover::after { width: 300px; height: 300px; }
 
 .btn-secondary {
   display: inline-flex; align-items: center; gap: 8px;
@@ -210,20 +267,114 @@ body {
   font-family: var(--font-sans); font-weight: 600; font-size: 15px;
   padding: 14px 28px; border: 1px solid rgba(127,231,196,0.15);
   border-radius: var(--radius-md); cursor: pointer;
-  transition: all var(--transition-fast);
 }
-
 .btn-secondary:hover {
   background: rgba(127,231,196,0.1); border-color: rgba(127,231,196,0.3);
   transform: translateY(-1px);
 }
 
-.landing-integrations {
-  display: flex; gap: 24px; align-items: center; flex-wrap: wrap;
-  justify-content: center;
+/* ── Trust Badges ── */
+.landing-trust {
+  display: flex; gap: 20px; align-items: center; flex-wrap: wrap;
   animation: fadeUp 0.6s 0.4s ease-out both;
 }
+.trust-badge {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--text-muted); font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+.trust-badge svg { width: 16px; height: 16px; color: var(--accent); opacity: 0.6; }
+.trust-divider { width: 1px; height: 16px; background: var(--glass-border); }
 
+/* ── Dashboard Preview ── */
+.dashboard-preview {
+  width: 100%; max-width: 480px;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: 16px; backdrop-filter: blur(16px);
+  padding: 20px; position: relative;
+  box-shadow: 0 0 60px rgba(127,231,196,0.08), 0 20px 60px rgba(0,0,0,0.3);
+  animation: floatPreview 6s ease-in-out infinite;
+}
+@keyframes floatPreview {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-12px) rotate(0.5deg); }
+}
+.dashboard-preview::before {
+  content: ''; position: absolute; inset: -1px; border-radius: 17px;
+  background: linear-gradient(135deg, rgba(127,231,196,0.2), transparent 40%, transparent 60%, rgba(56,189,248,0.15));
+  z-index: -1; mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: xor; -webkit-mask-composite: xor; padding: 1px;
+}
+
+.preview-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 16px;
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);
+  letter-spacing: 0.06em; text-transform: uppercase;
+}
+.preview-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+
+.preview-stats {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;
+}
+.preview-stat {
+  background: rgba(127,231,196,0.04); border: 1px solid rgba(127,231,196,0.08);
+  border-radius: 10px; padding: 12px;
+}
+.preview-stat-num {
+  font-family: var(--font-mono); font-size: 22px; font-weight: 700; color: var(--accent);
+}
+.preview-stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; font-family: var(--font-mono); }
+
+.preview-chart { margin-bottom: 14px; }
+.preview-chart-bars { display: flex; align-items: flex-end; gap: 6px; height: 60px; }
+.preview-bar {
+  flex: 1; border-radius: 4px 4px 0 0; background: linear-gradient(to top, var(--accent), rgba(127,231,196,0.3));
+  animation: barGrow 1.5s ease-out both;
+}
+@keyframes barGrow { from { height: 0 !important; } }
+.preview-chart-label { font-size: 9px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 4px; text-align: center; }
+
+.preview-molecule {
+  display: flex; align-items: center; justify-content: center;
+  padding: 14px; background: rgba(127,231,196,0.03); border-radius: 10px;
+  border: 1px solid rgba(127,231,196,0.06);
+}
+.molecule-svg {
+  animation: moleculeRotate 12s linear infinite;
+}
+@keyframes moleculeRotate { to { transform: rotate(360deg); } }
+
+/* Processing indicator */
+.preview-processing {
+  display: flex; align-items: center; gap: 8px; margin-top: 12px;
+  font-family: var(--font-mono); font-size: 10px; color: var(--accent);
+  letter-spacing: 0.04em;
+}
+.processing-dots span {
+  display: inline-block; width: 4px; height: 4px; border-radius: 50%;
+  background: var(--accent); animation: processingDot 1.4s infinite;
+}
+.processing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.processing-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes processingDot { 0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1.2); } }
+
+/* Glow behind preview */
+.preview-glow {
+  position: absolute; width: 300px; height: 300px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(127,231,196,0.12), transparent 70%);
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+  z-index: -1; filter: blur(40px);
+  animation: glowPulse 4s ease-in-out infinite;
+}
+@keyframes glowPulse { 0%,100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); } 50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); } }
+
+/* ── Integration Badges ── */
+.landing-integrations {
+  display: flex; gap: 24px; align-items: center; flex-wrap: wrap;
+  justify-content: center; margin-top: 48px;
+  animation: fadeUp 0.6s 0.4s ease-out both;
+}
 .integration-badge {
   display: flex; align-items: center; gap: 8px;
   padding: 10px 16px; border-radius: var(--radius-md);
@@ -231,92 +382,31 @@ body {
   backdrop-filter: blur(12px); font-size: 13px; color: var(--text-dim);
   transition: all var(--transition-fast);
 }
-
-.integration-badge:hover {
-  border-color: var(--glass-border-hover);
-  background: rgba(127,231,196,0.06);
-}
-
+.integration-badge:hover { border-color: var(--glass-border-hover); background: rgba(127,231,196,0.06); }
 .integration-badge svg { width: 18px; height: 18px; color: var(--accent); flex-shrink: 0; }
 .integration-badge strong { color: var(--text); font-weight: 600; }
 
-.landing-features {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px; max-width: 800px; width: 100%; margin-top: 56px;
-  animation: fadeUp 0.6s 0.5s ease-out both;
-}
-
-.feature-card {
-  padding: 22px; border-radius: var(--radius-lg);
-  background: var(--glass-bg); border: 1px solid var(--glass-border);
-  backdrop-filter: blur(12px);
-  transition: all var(--transition-smooth);
-}
-
-.feature-card:hover {
-  border-color: var(--glass-border-hover);
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-glow);
-}
-
-.feature-card svg { width: 28px; height: 28px; color: var(--accent); margin-bottom: 12px; }
-.feature-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
-.feature-card p { font-size: 12.5px; color: var(--text-dim); line-height: 1.5; }
-
-.landing-footer {
-  margin-top: 48px; font-size: 12px; color: var(--text-muted);
-  text-align: center;
-  animation: fadeUp 0.6s 0.6s ease-out both;
-}
-.landing-footer-links {
-  display: flex; gap: 20px; justify-content: center; margin-bottom: 10px;
-}
-.landing-footer-links a {
-  color: var(--accent-dim); text-decoration: none; font-size: 12px;
-  transition: color var(--transition-fast);
-}
-.landing-footer-links a:hover { color: var(--accent); }
-.landing-footer-credit { margin-bottom: 4px; }
-.landing-footer-credit strong { color: var(--text-dim); }
-.landing-footer-version { font-size: 10.5px; color: var(--text-muted); opacity: 0.6; }
-
-/* ═══ LANDING HERO ═══ */
-.landing-hero {
-  display: flex; flex-direction: column; align-items: center;
-  animation: fadeUp 0.6s ease-out both;
-}
-
-/* ═══ STATS BAR ═══ */
+/* ── Stats Bar ── */
 .landing-stats-bar {
   display: flex; gap: 0; align-items: center; justify-content: center;
-  margin: 40px 0 0; padding: 24px 40px;
+  margin: 0; padding: 24px 40px;
   background: var(--glass-bg); border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg); backdrop-filter: blur(12px);
   max-width: 680px; width: 100%;
-  animation: fadeUp 0.6s 0.7s ease-out both;
 }
-.landing-stat {
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-  flex: 1; padding: 0 20px;
-}
+.landing-stat { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; padding: 0 20px; }
 .landing-stat-num {
   font-family: var(--font-mono); font-size: 28px; font-weight: 700;
-  background: linear-gradient(135deg, var(--accent), #B8F0D8);
+  background: linear-gradient(135deg, var(--accent), #67E8F9);
   -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
 }
-.landing-stat-label {
-  font-size: 11px; color: var(--text-muted); text-transform: uppercase;
-  letter-spacing: 0.06em; font-family: var(--font-mono);
-}
-.landing-stat-divider {
-  width: 1px; height: 36px; background: var(--glass-border); flex-shrink: 0;
-}
+.landing-stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; font-family: var(--font-mono); }
+.landing-stat-divider { width: 1px; height: 36px; background: var(--glass-border); flex-shrink: 0; }
 
-/* ═══ LANDING SECTIONS ═══ */
+/* ── Landing Sections ── */
 .landing-section {
   max-width: 900px; width: 100%; margin: 56px auto 0;
   display: flex; flex-direction: column; align-items: center;
-  animation: fadeUp 0.6s ease-out both;
 }
 .landing-section-label {
   font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em;
@@ -332,168 +422,104 @@ body {
   letter-spacing: -0.02em; margin-bottom: 32px; max-width: 600px;
 }
 
-/* ═══ HOW IT WORKS ═══ */
-.landing-steps {
-  display: flex; align-items: flex-start; gap: 0; width: 100%;
-}
-.step-card {
-  flex: 1; display: flex; flex-direction: column; align-items: center;
-  text-align: center; padding: 24px 16px; position: relative;
-}
-.step-number {
-  position: absolute; top: 12px; right: 16px;
-  font-family: var(--font-mono); font-size: 42px; font-weight: 800;
-  color: rgba(127,231,196,0.06); line-height: 1;
-}
-.step-icon {
-  width: 48px; height: 48px; border-radius: 14px;
-  background: rgba(127,231,196,0.08); border: 1px solid rgba(127,231,196,0.15);
-  display: flex; align-items: center; justify-content: center; margin-bottom: 16px;
-}
+/* ── How It Works ── */
+.landing-steps { display: flex; align-items: flex-start; gap: 0; width: 100%; }
+.step-card { flex: 1; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 24px 16px; position: relative; }
+.step-number { position: absolute; top: 12px; right: 16px; font-family: var(--font-mono); font-size: 42px; font-weight: 800; color: rgba(127,231,196,0.06); line-height: 1; }
+.step-icon { width: 48px; height: 48px; border-radius: 14px; background: rgba(127,231,196,0.08); border: 1px solid rgba(127,231,196,0.15); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
 .step-icon svg { width: 24px; height: 24px; color: var(--accent); }
 .step-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
 .step-card p { font-size: 13px; color: var(--text-dim); line-height: 1.6; max-width: 240px; }
-.step-connector {
-  width: 40px; flex-shrink: 0; display: flex; align-items: center;
-  justify-content: center; padding-top: 48px;
-}
+.step-connector { width: 40px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding-top: 48px; }
 .step-connector svg { width: 20px; height: 20px; color: var(--accent); opacity: 0.4; }
 
-/* ═══ FEATURES GRID ═══ */
-.landing-features {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 14px; max-width: 900px; width: 100%;
+/* ── Features Grid ── */
+.landing-features { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; max-width: 900px; width: 100%; }
+.feature-card {
+  padding: 22px; border-radius: var(--radius-lg);
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px); transition: all var(--transition-smooth);
 }
+.feature-card:hover { border-color: var(--glass-border-hover); transform: translateY(-3px); box-shadow: var(--shadow-glow); }
+.feature-card svg { width: 28px; height: 28px; color: var(--accent); margin-bottom: 12px; }
+.feature-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.feature-card p { font-size: 12.5px; color: var(--text-dim); line-height: 1.5; }
 
-/* ═══ USE CASES ═══ */
-.landing-usecases {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px; width: 100%;
-}
+/* ── Use Cases ── */
+.landing-usecases { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; width: 100%; }
 .usecase-card {
   padding: 24px; border-radius: var(--radius-lg);
   background: var(--glass-bg); border: 1px solid var(--glass-border);
-  backdrop-filter: blur(12px); text-align: center;
-  transition: all var(--transition-smooth);
+  backdrop-filter: blur(12px); text-align: center; transition: all var(--transition-smooth);
 }
-.usecase-card:hover {
-  border-color: var(--glass-border-hover);
-  transform: translateY(-3px); box-shadow: var(--shadow-glow);
-}
+.usecase-card:hover { border-color: var(--glass-border-hover); transform: translateY(-3px); box-shadow: var(--shadow-glow); }
 .usecase-emoji { font-size: 32px; margin-bottom: 12px; }
 .usecase-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
 .usecase-card p { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
 
-/* ═══ TESTIMONIALS ═══ */
-.landing-testimonials {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px; width: 100%;
-}
-.testimonial-card {
-  padding: 24px; border-radius: var(--radius-lg);
-  background: var(--glass-bg); border: 1px solid var(--glass-border);
-  backdrop-filter: blur(12px);
-  transition: all var(--transition-smooth);
-}
-.testimonial-card:hover {
-  border-color: var(--glass-border-hover);
-  transform: translateY(-2px);
-}
-.testimonial-stars { color: var(--amber); font-size: 14px; margin-bottom: 12px; letter-spacing: 2px; }
-.testimonial-text {
-  font-size: 13.5px; color: var(--text-dim); line-height: 1.65;
-  font-style: italic; margin-bottom: 16px;
-}
-.testimonial-author {
-  display: flex; align-items: center; gap: 10px;
-}
-.testimonial-avatar {
-  width: 36px; height: 36px; border-radius: 50%;
-  background: rgba(127,231,196,0.12); border: 1px solid rgba(127,231,196,0.2);
-  display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-mono); font-size: 14px; font-weight: 700; color: var(--accent);
-}
-.testimonial-name { font-size: 13px; font-weight: 600; }
-.testimonial-role { font-size: 11px; color: var(--text-muted); }
-
-/* ═══ FAQ ═══ */
-.landing-faq {
-  width: 100%; max-width: 700px;
-  display: flex; flex-direction: column; gap: 8px;
-}
-.faq-item {
-  border-radius: var(--radius-md);
-  background: var(--glass-bg); border: 1px solid var(--glass-border);
-  backdrop-filter: blur(12px); overflow: hidden;
-  transition: border-color var(--transition-fast);
-}
+/* ── FAQ ── */
+.landing-faq { width: 100%; max-width: 700px; display: flex; flex-direction: column; gap: 8px; }
+.faq-item { border-radius: var(--radius-md); background: var(--glass-bg); border: 1px solid var(--glass-border); backdrop-filter: blur(12px); overflow: hidden; transition: border-color var(--transition-fast); }
 .faq-item:hover { border-color: var(--glass-border-hover); }
 .faq-item.open { border-color: rgba(127,231,196,0.25); }
-.faq-question {
-  width: 100%; display: flex; justify-content: space-between; align-items: center;
-  padding: 16px 18px; background: none; border: none; cursor: pointer;
-  font-family: var(--font-sans); font-size: 14px; font-weight: 600;
-  color: var(--text); text-align: left;
-}
-.faq-question svg {
-  width: 18px; height: 18px; color: var(--text-muted); flex-shrink: 0;
-  transition: transform 0.25s ease;
-}
+.faq-question { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 16px 18px; background: none; border: none; cursor: pointer; font-family: var(--font-sans); font-size: 14px; font-weight: 600; color: var(--text); text-align: left; }
+.faq-question svg { width: 18px; height: 18px; color: var(--text-muted); flex-shrink: 0; transition: transform 0.25s ease; }
 .faq-item.open .faq-question svg { transform: rotate(180deg); color: var(--accent); }
-.faq-answer {
-  max-height: 0; overflow: hidden;
-  transition: max-height 0.3s ease, padding 0.3s ease;
-}
-.faq-item.open .faq-answer {
-  max-height: 300px;
-}
-.faq-answer p {
-  padding: 0 18px 16px; font-size: 13px; color: var(--text-dim); line-height: 1.65;
-}
+.faq-answer { max-height: 0; overflow: hidden; transition: max-height 0.3s ease, padding 0.3s ease; }
+.faq-item.open .faq-answer { max-height: 300px; }
+.faq-answer p { padding: 0 18px 16px; font-size: 13px; color: var(--text-dim); line-height: 1.65; }
 .faq-answer strong { color: var(--text); }
 
-/* ═══ CONTACT ═══ */
-.landing-contact {
-  width: 100%; max-width: 600px;
-  display: flex; flex-direction: column; gap: 16px;
-}
-.contact-card {
-  display: flex; align-items: flex-start; gap: 18px;
-  padding: 24px; border-radius: var(--radius-lg);
-  background: var(--glass-bg); border: 1px solid var(--glass-border);
-  backdrop-filter: blur(12px);
-  transition: all var(--transition-smooth);
-}
-.contact-card:hover {
-  border-color: var(--glass-border-hover);
-  transform: translateY(-2px); box-shadow: var(--shadow-glow);
-}
-.contact-icon {
-  width: 48px; height: 48px; border-radius: 14px;
-  background: rgba(127,231,196,0.08); border: 1px solid rgba(127,231,196,0.15);
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
+/* ── Contact ── */
+.landing-contact { width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: 16px; }
+.contact-card { display: flex; align-items: flex-start; gap: 18px; padding: 24px; border-radius: var(--radius-lg); background: var(--glass-bg); border: 1px solid var(--glass-border); backdrop-filter: blur(12px); transition: all var(--transition-smooth); }
+.contact-card:hover { border-color: var(--glass-border-hover); transform: translateY(-2px); box-shadow: var(--shadow-glow); }
+.contact-icon { width: 48px; height: 48px; border-radius: 14px; background: rgba(127,231,196,0.08); border: 1px solid rgba(127,231,196,0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .contact-icon svg { width: 24px; height: 24px; color: var(--accent); }
 .contact-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
 .contact-card p { font-size: 13px; color: var(--text-dim); line-height: 1.5; margin-bottom: 8px; }
-.contact-email {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-family: var(--font-mono); font-size: 13px; font-weight: 600;
-  color: var(--accent); text-decoration: none;
-  padding: 6px 14px; border-radius: var(--radius-sm);
-  background: rgba(127,231,196,0.06); border: 1px solid rgba(127,231,196,0.15);
-  transition: all var(--transition-fast);
-}
-.contact-email:hover {
-  background: rgba(127,231,196,0.12); border-color: rgba(127,231,196,0.3);
-}
+.contact-email { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; padding: 6px 14px; border-radius: var(--radius-sm); background: rgba(127,231,196,0.06); border: 1px solid rgba(127,231,196,0.15); transition: all var(--transition-fast); }
+.contact-email:hover { background: rgba(127,231,196,0.12); border-color: rgba(127,231,196,0.3); }
 
-/* ═══ CTA SECTION ═══ */
+/* ── CTA Section ── */
 .landing-cta-section {
   padding: 48px 24px; border-radius: var(--radius-lg);
   background: linear-gradient(135deg, rgba(127,231,196,0.06), rgba(127,231,196,0.02));
-  border: 1px solid rgba(127,231,196,0.12);
-  margin-top: 20px;
+  border: 1px solid rgba(127,231,196,0.12); margin-top: 20px;
+}
+
+/* ── Footer ── */
+.landing-footer { margin-top: 48px; font-size: 12px; color: var(--text-muted); text-align: center; }
+.landing-footer-links { display: flex; gap: 20px; justify-content: center; margin-bottom: 10px; }
+.landing-footer-links a { color: var(--accent-dim); text-decoration: none; font-size: 12px; transition: color var(--transition-fast); }
+.landing-footer-links a:hover { color: var(--accent); }
+.landing-footer-credit { margin-bottom: 4px; }
+.landing-footer-credit strong { color: var(--text-dim); }
+.landing-footer-version { font-size: 10.5px; color: var(--text-muted); opacity: 0.6; }
+
+/* ── Responsive ── */
+@media (max-width: 960px) {
+  .landing-hero { grid-template-columns: 1fr; gap: 40px; text-align: center; padding: 60px 0 40px; }
+  .hero-left { align-items: center; }
+  .hero-right { display: none; }
+  .landing-title { font-size: 28px; }
+  .landing-features { grid-template-columns: 1fr 1fr; }
+  .landing-steps { flex-direction: column; align-items: center; }
+  .step-connector { transform: rotate(90deg); padding: 0; width: auto; height: 30px; }
+  .landing-stats-bar { flex-wrap: wrap; gap: 12px; }
+  .landing-stat-divider { display: none; }
+  .landing-stat { padding: 8px 16px; }
+}
+@media (max-width: 640px) {
+  .landing-title { font-size: 24px; }
+  .landing-actions { flex-direction: column; width: 100%; }
+  .landing-actions button { width: 100%; justify-content: center; }
+  .landing-features { grid-template-columns: 1fr; }
+  .landing-usecases { grid-template-columns: 1fr; }
+  .landing-stats-bar { flex-wrap: wrap; gap: 8px; padding: 16px; }
+  .landing-stat-divider { display: none; }
+  .landing-stat { padding: 6px 12px; }
+  .landing-stat-num { font-size: 22px; }
 }
 
 /* ═══ AUTH SCREEN ═══ */
@@ -1473,13 +1499,6 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
 
 @media (max-width: 700px) {
   body { padding: 0; }
-  .landing-title { font-size: 28px; }
-  .landing-features { grid-template-columns: 1fr 1fr; }
-  .landing-steps { flex-direction: column; align-items: center; }
-  .step-connector { transform: rotate(90deg); padding: 0; width: auto; height: 30px; }
-  .landing-stats-bar { flex-wrap: wrap; gap: 12px; }
-  .landing-stat-divider { display: none; }
-  .landing-stat { padding: 8px 16px; }
   .stats-row { grid-template-columns: repeat(2, 1fr); }
   .results-header { flex-direction: column; align-items: flex-start; gap: 10px; }
   .results-header > div { width: 100%; }
@@ -1489,18 +1508,6 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
 }
 
 @media (max-width: 420px) {
-  .landing-title { font-size: 24px; }
-  .landing-actions { flex-direction: column; width: 100%; }
-  .landing-actions button { width: 100%; justify-content: center; }
-  .landing-features { grid-template-columns: 1fr; }
-  .landing-steps { flex-direction: column; align-items: center; }
-  .step-connector { transform: rotate(90deg); padding: 0; width: auto; height: 30px; }
-  .landing-usecases { grid-template-columns: 1fr; }
-  .landing-testimonials { grid-template-columns: 1fr; }
-  .landing-stats-bar { flex-wrap: wrap; gap: 8px; padding: 16px; }
-  .landing-stat-divider { display: none; }
-  .landing-stat { padding: 6px 12px; }
-  .landing-stat-num { font-size: 22px; }
   .stats-row { grid-template-columns: 1fr; }
 }
 
@@ -1603,302 +1610,209 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
 <!-- ═══════════════════════════════════════ -->
 <div id="landingPage">
 
-  <!-- ═══ HERO ═══ -->
-  <div class="landing-hero">
-    <div class="landing-badge"><span class="dot"></span> v2.2 · Research Platform</div>
+<!-- Animated gradient background -->
+<div class="landing-gradient-bg"></div>
 
-    <h1 class="landing-title">
-      Drug Design<br><span class="gradient">Universe</span>
-    </h1>
+<!-- Floating particles -->
+<div class="landing-particles">
+  <div class="landing-particle" style="width:6px;height:6px;left:10%;animation-duration:14s;animation-delay:0s;"></div>
+  <div class="landing-particle" style="width:4px;height:4px;left:25%;animation-duration:18s;animation-delay:3s;"></div>
+  <div class="landing-particle" style="width:8px;height:8px;left:45%;animation-duration:12s;animation-delay:6s;"></div>
+  <div class="landing-particle" style="width:5px;height:5px;left:65%;animation-duration:16s;animation-delay:2s;"></div>
+  <div class="landing-particle" style="width:3px;height:3px;left:80%;animation-duration:20s;animation-delay:8s;"></div>
+  <div class="landing-particle" style="width:7px;height:7px;left:90%;animation-duration:15s;animation-delay:5s;"></div>
+</div>
 
-    <p class="landing-subtitle">
-      Batch PubChem lookup, ADMET profiling, and automated report generation — built for pharmaceutical researchers who need reliable, reproducible data workflows.
-    </p>
+<!-- Cursor glow -->
+<div class="cursor-glow" id="cursorGlow"></div>
 
-    <div class="landing-actions">
+<!-- SPLIT HERO -->
+<div class="landing-hero">
+  <div class="hero-left">
+    <div class="landing-badge reveal"><span class="dot"></span> v2.2 · Research Platform</div>
+    <h1 class="landing-title reveal reveal-d1">Accelerate Your<br><span class="gradient">Drug Discovery</span></h1>
+    <p class="landing-subtitle reveal reveal-d2">Batch PubChem lookup, ADMET profiling, and automated report generation — the all-in-one platform for pharmaceutical researchers.</p>
+    <div class="landing-actions reveal reveal-d3">
       <button class="btn-primary" id="landingSignIn">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
         Get Started — Free
       </button>
       <button class="btn-secondary" id="landingGuest">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        Try as Guest
-      </button>
-    </div>
-
-    <div class="landing-integrations">
-      <div class="integration-badge">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-        <strong>PubChem</strong> API
-      </div>
-      <div class="integration-badge">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-        <strong>SwissADME</strong>
-      </div>
-      <div class="integration-badge">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        <strong>ProTox-3</strong>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══ STATS BAR ═══ -->
-  <div class="landing-stats-bar">
-    <div class="landing-stat">
-      <span class="landing-stat-num">50+</span>
-      <span class="landing-stat-label">Compounds per batch</span>
-    </div>
-    <div class="landing-stat-divider"></div>
-    <div class="landing-stat">
-      <span class="landing-stat-num">26</span>
-      <span class="landing-stat-label">ADMET parameters</span>
-    </div>
-    <div class="landing-stat-divider"></div>
-    <div class="landing-stat">
-      <span class="landing-stat-num">3</span>
-      <span class="landing-stat-label">Export formats</span>
-    </div>
-    <div class="landing-stat-divider"></div>
-    <div class="landing-stat">
-      <span class="landing-stat-num">0</span>
-      <span class="landing-stat-label">Cost — it's free</span>
-    </div>
-  </div>
-
-  <!-- ═══ HOW IT WORKS ═══ -->
-  <div class="landing-section">
-    <div class="landing-section-label">How it works</div>
-    <h2 class="landing-section-title">From compound IDs to publication-ready reports in 3 steps</h2>
-
-    <div class="landing-steps">
-      <div class="step-card">
-        <div class="step-number">1</div>
-        <div class="step-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        </div>
-        <h3>Look Up Compounds</h3>
-        <p>Enter PubChem CIDs or compound names — up to 50 at once. Upload from Excel/CSV, or drag-and-drop a file. Auto-resolves names to CIDs and fetches SMILES, formula, MW, and structures.</p>
-      </div>
-
-      <div class="step-connector">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
-      </div>
-
-      <div class="step-card">
-        <div class="step-number">2</div>
-        <div class="step-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-        </div>
-        <h3>Profile ADMET Data</h3>
-        <p>Paste results from SwissADME & ProTox-3 directly — the parser auto-fills 26 physicochemical, pharmacokinetic, and toxicity fields. CID→SMILES and SMILES→CID lookups work automatically.</p>
-      </div>
-
-      <div class="step-connector">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
-      </div>
-
-      <div class="step-card">
-        <div class="step-number">3</div>
-        <div class="step-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        </div>
-        <h3>Export & Report</h3>
-        <p>Download compound data as Excel spreadsheets, SDF structure files (3D/2D ZIP), or generate a formatted Word report with all ADMET tables — ready for your thesis or paper.</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══ FEATURES ═══ -->
-  <div class="landing-section">
-    <div class="landing-section-label">Features</div>
-    <h2 class="landing-section-title">Everything you need for drug discovery data workflows</h2>
-
-    <div class="landing-features">
-      <div class="feature-card">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <h3>Batch Lookup</h3>
-        <p>Look up 50 compounds at once — CIDs, names, structures, SMILES, and more.</p>
-      </div>
-      <div class="feature-card">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-        <h3>ADMET Reports</h3>
-        <p>Auto-generate Word reports with physicochemical, pharmacokinetic, and toxicity tables.</p>
-      </div>
-      <div class="feature-card">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        <h3>Multi-Format Export</h3>
-        <p>Download results as Excel, SDF ZIP, or Word documents with one click.</p>
-      </div>
-      <div class="feature-card">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/></svg>
-        <h3>Keyboard Shortcuts</h3>
-        <p>Ctrl+K command palette, Ctrl+Enter to fetch, Ctrl+Shift+E to export — power-user friendly.</p>
-      </div>
-      <div class="feature-card">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-        <h3>Drag & Drop Upload</h3>
-        <p>Import CIDs from Excel or CSV files instantly — just drag your spreadsheet onto the page.</p>
-      </div>
-      <div class="feature-card">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
-        <h3>Smart Paste Parser</h3>
-        <p>Copy SwissADME or ProTox-3 output and paste it — auto-fills all 26 ADMET fields instantly.</p>
-      </div>
-      <div class="feature-card">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
-        <h3>Batch Statistics</h3>
-        <p>MW distribution, Lipinski compliance, data completeness — all visualized in one click.</p>
-      </div>
-      <div class="feature-card">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-        <h3>Compound Comparison</h3>
-        <p>Side-by-side diff table — instantly spot differences across molecular properties.</p>
-      </div>
-      <div class="feature-card">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-        <h3>Session History</h3>
-        <p>Save and load ADMET sessions to the cloud — pick up where you left off on any device.</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══ USE CASES ═══ -->
-  <div class="landing-section">
-    <div class="landing-section-label">Built for</div>
-    <h2 class="landing-section-title">Who uses Drug Design Universe?</h2>
-
-    <div class="landing-usecases">
-      <div class="usecase-card">
-        <div class="usecase-emoji">🎓</div>
-        <h3>Pharmacy Students</h3>
-        <p>Building ADMET tables for your thesis? Generate publication-ready Word reports in minutes, not hours of manual formatting.</p>
-      </div>
-      <div class="usecase-card">
-        <div class="usecase-emoji">🔬</div>
-        <h3>Research Labs</h3>
-        <p>Batch-screen compound libraries with one click. Compare properties side-by-side and export structured data for further analysis.</p>
-      </div>
-      <div class="usecase-card">
-        <div class="usecase-emoji">💊</div>
-        <h3>Drug Discovery Teams</h3>
-        <p>Rapidly profile lead candidates — ADMET, toxicity, and drug-likeness in a single integrated workflow with cloud session history.</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══ CONTACT ═══ -->
-  <div class="landing-section">
-    <div class="landing-section-label">Contact</div>
-    <h2 class="landing-section-title">Get in touch</h2>
-
-    <div class="landing-contact">
-      <div class="contact-card">
-        <div class="contact-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-        </div>
-        <div>
-          <h3>Md Musfiqur Rahaman</h3>
-          <p>Dept. of Pharmacy · Daffodil International University</p>
-          <a href="mailto:rahaman2311091088@diu.edu.bd" class="contact-email">rahaman2311091088@diu.edu.bd</a>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══ FAQ ═══ -->
-  <div class="landing-section">
-    <div class="landing-section-label">FAQ</div>
-    <h2 class="landing-section-title">Frequently asked questions</h2>
-
-    <div class="landing-faq">
-      <div class="faq-item">
-        <button class="faq-question" onclick="this.parentElement.classList.toggle('open')">
-          <span>Is Drug Design Universe really free?</span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-        </button>
-        <div class="faq-answer">
-          <p>Yes, 100% free. There are no hidden fees, no premium tiers, and no usage limits. All data is fetched from public APIs (PubChem) and your own SwissADME/ProTox inputs. The only cost is your internet connection.</p>
-        </div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-question" onclick="this.parentElement.classList.toggle('open')">
-          <span>Do I need to install anything?</span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-        </button>
-        <div class="faq-answer">
-          <p>No installation needed. DDU runs entirely in your browser — just open the website and start working. It works on desktop Chrome, Firefox, Edge, and Safari. No plugins, no extensions.</p>
-        </div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-question" onclick="this.parentElement.classList.toggle('open')">
-          <span>Is my data stored or shared?</span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-        </button>
-        <div class="faq-answer">
-          <p>Your compound lookups go directly to PubChem's public API. ADMET data you enter is stored only in your browser session and your Supabase account (if you save sessions). Nothing is shared with third parties. You can delete your sessions anytime.</p>
-        </div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-question" onclick="this.parentElement.classList.toggle('open')">
-          <span>How many compounds can I process at once?</span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-        </button>
-        <div class="faq-answer">
-          <p>Up to 50 compounds per PubChem batch lookup. For ADMET reports, you can add up to 60 compounds, and the Word report automatically paginates them (15 per table page). You can also save and reload sessions to work across multiple batches.</p>
-        </div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-question" onclick="this.parentElement.classList.toggle('open')">
-          <span>Can I use it without creating an account?</span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-        </button>
-        <div class="faq-answer">
-          <p>Yes! Click "Try as Guest" and enter the access code provided by your instructor or lab. Guest access gives you full functionality including PubChem lookups, ADMET profiling, and report generation. Only session saving requires a personal account.</p>
-        </div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-question" onclick="this.parentElement.classList.toggle('open')">
-          <span>What formats can I export?</span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-        </button>
-        <div class="faq-answer">
-          <p>Three formats: <strong>Excel (.xlsx)</strong> for spreadsheet analysis, <strong>SDF ZIP</strong> with 3D/2D molecular structure files for cheminformatics tools, and <strong>Word (.docx)</strong> formatted ADMET reports with Table A (physicochemical properties) and Table B (toxicity profile) — ready for your paper.</p>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══ FINAL CTA ═══ -->
-  <div class="landing-section landing-cta-section">
-    <h2 class="landing-section-title" style="max-width:500px;">Ready to accelerate your drug discovery research?</h2>
-    <p class="landing-subtitle" style="margin-bottom:28px;">Join researchers who trust DDU for fast, reproducible compound profiling and report generation.</p>
-    <div class="landing-actions">
-      <button class="btn-primary" onclick="document.getElementById('landingSignIn').click()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-        Start for Free
-      </button>
-      <button class="btn-secondary" onclick="document.getElementById('landingGuest').click()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         Guest Access
       </button>
     </div>
+    <div class="landing-trust reveal reveal-d4">
+      <div class="trust-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg> PubChem API</div>
+      <div class="trust-divider"></div>
+      <div class="trust-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> SwissADME</div>
+      <div class="trust-divider"></div>
+      <div class="trust-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> ProTox-3</div>
+    </div>
   </div>
-
-  <!-- ═══ FOOTER ═══ -->
-  <div class="landing-footer">
-    <div class="landing-footer-links">
-      <a href="https://pubchem.ncbi.nlm.nih.gov/" target="_blank" rel="noopener">PubChem</a>
-      <a href="https://www.swissadme.ch/" target="_blank" rel="noopener">SwissADME</a>
-      <a href="https://tox-new.charite.de/protox3/" target="_blank" rel="noopener">ProTox-3</a>
-      <a href="https://github.com/rahaman2311091088-eng/musfiqsmileseveryday" target="_blank" rel="noopener">GitHub</a>
+  <div class="hero-right">
+    <div class="preview-glow"></div>
+    <div class="dashboard-preview">
+      <div class="preview-header"><span class="preview-dot"></span> DDU Dashboard — Live</div>
+      <div class="preview-stats">
+        <div class="preview-stat"><div class="preview-stat-num" id="previewCompoundCount">0</div><div class="preview-stat-label">Compounds</div></div>
+        <div class="preview-stat"><div class="preview-stat-num" id="previewReportCount">0</div><div class="preview-stat-label">Reports</div></div>
+      </div>
+      <div class="preview-chart">
+        <div class="preview-chart-bars">
+          <div class="preview-bar" style="height:40%;animation-delay:0.2s;"></div>
+          <div class="preview-bar" style="height:65%;animation-delay:0.4s;"></div>
+          <div class="preview-bar" style="height:80%;animation-delay:0.6s;"></div>
+          <div class="preview-bar" style="height:55%;animation-delay:0.8s;"></div>
+          <div class="preview-bar" style="height:90%;animation-delay:1.0s;"></div>
+          <div class="preview-bar" style="height:70%;animation-delay:1.2s;"></div>
+          <div class="preview-bar" style="height:45%;animation-delay:1.4s;"></div>
+        </div>
+        <div class="preview-chart-label">MW Distribution</div>
+      </div>
+      <div class="preview-molecule">
+        <svg class="molecule-svg" width="100" height="80" viewBox="0 0 100 80" fill="none">
+          <circle cx="50" cy="40" r="12" stroke="#7FE7C4" stroke-width="2"/><circle cx="20" cy="20" r="8" stroke="#7FE7C4" stroke-width="1.5" opacity="0.7"/><circle cx="80" cy="20" r="8" stroke="#7FE7C4" stroke-width="1.5" opacity="0.7"/><circle cx="20" cy="60" r="8" stroke="#7FE7C4" stroke-width="1.5" opacity="0.7"/><circle cx="80" cy="60" r="8" stroke="#7FE7C4" stroke-width="1.5" opacity="0.7"/>
+          <line x1="42" y1="32" x2="26" y2="24" stroke="#7FE7C4" stroke-width="1.5" opacity="0.5"/><line x1="58" y1="32" x2="74" y2="24" stroke="#7FE7C4" stroke-width="1.5" opacity="0.5"/><line x1="42" y1="48" x2="26" y2="56" stroke="#7FE7C4" stroke-width="1.5" opacity="0.5"/><line x1="58" y1="48" x2="74" y2="56" stroke="#7FE7C4" stroke-width="1.5" opacity="0.5"/>
+          <circle cx="50" cy="40" r="4" fill="#7FE7C4" opacity="0.4"/><circle cx="20" cy="20" r="3" fill="#7FE7C4" opacity="0.3"/><circle cx="80" cy="20" r="3" fill="#7FE7C4" opacity="0.3"/><circle cx="20" cy="60" r="3" fill="#7FE7C4" opacity="0.3"/><circle cx="80" cy="60" r="3" fill="#7FE7C4" opacity="0.3"/>
+        </svg>
+      </div>
+      <div class="preview-processing"><span>Processing compounds</span><span class="processing-dots"><span></span><span></span><span></span></span></div>
     </div>
-    <div class="landing-footer-credit">
-      Created by <strong>Md Musfiqur Rahaman</strong> · Dept. of Pharmacy · Daffodil International University<br>
-      <a href="mailto:rahaman2311091088@diu.edu.bd" style="color:var(--accent-dim);text-decoration:none;font-size:11px;">rahaman2311091088@diu.edu.bd</a>
-    </div>
-    <div class="landing-footer-version">DDU v2.2.0 · Build 2026-06-25</div>
   </div>
 </div>
+
+<!-- STATS BAR -->
+<div class="landing-stats-bar reveal" style="margin-top:40px;position:relative;z-index:1;">
+  <div class="landing-stat"><span class="landing-stat-num">50+</span><span class="landing-stat-label">Compounds per batch</span></div>
+  <div class="landing-stat-divider"></div>
+  <div class="landing-stat"><span class="landing-stat-num">26</span><span class="landing-stat-label">ADMET parameters</span></div>
+  <div class="landing-stat-divider"></div>
+  <div class="landing-stat"><span class="landing-stat-num">3</span><span class="landing-stat-label">Export formats</span></div>
+  <div class="landing-stat-divider"></div>
+  <div class="landing-stat"><span class="landing-stat-num">0</span><span class="landing-stat-label">Cost — it\'s free</span></div>
+</div>
+
+<!-- HOW IT WORKS -->
+<div class="landing-section reveal" style="position:relative;z-index:1;">
+  <div class="landing-section-label">How it works</div>
+  <h2 class="landing-section-title">From compound IDs to publication-ready reports in 3 steps</h2>
+  <div class="landing-steps">
+    <div class="step-card"><div class="step-number">1</div><div class="step-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div><h3>Look Up Compounds</h3><p>Enter PubChem CIDs or names — up to 50 at once. Upload from Excel/CSV.</p></div>
+    <div class="step-connector"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg></div>
+    <div class="step-card"><div class="step-number">2</div><div class="step-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div><h3>Profile ADMET Data</h3><p>Paste results from SwissADME & ProTox-3 — auto-fills 26 fields instantly.</p></div>
+    <div class="step-connector"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg></div>
+    <div class="step-card"><div class="step-number">3</div><div class="step-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div><h3>Export & Report</h3><p>Download as Excel, SDF ZIP, or generate a formatted Word report.</p></div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<div class="landing-section reveal" style="position:relative;z-index:1;">
+  <div class="landing-section-label">Features</div>
+  <h2 class="landing-section-title">Everything you need for drug discovery data workflows</h2>
+  <div class="landing-features">
+    <div class="feature-card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><h3>Batch Lookup</h3><p>Look up 50 compounds at once — CIDs, names, structures, SMILES.</p></div>
+    <div class="feature-card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><h3>ADMET Reports</h3><p>Auto-generate Word reports with physicochemical and toxicity tables.</p></div>
+    <div class="feature-card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><h3>Multi-Format Export</h3><p>Excel, SDF ZIP, or Word documents with one click.</p></div>
+    <div class="feature-card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/></svg><h3>Keyboard Shortcuts</h3><p>Ctrl+K command palette, Ctrl+Enter to fetch — power-user friendly.</p></div>
+    <div class="feature-card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg><h3>Drag & Drop Upload</h3><p>Import CIDs from Excel or CSV files instantly.</p></div>
+    <div class="feature-card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg><h3>Smart Paste Parser</h3><p>Copy SwissADME or ProTox-3 output — auto-fills all 26 fields.</p></div>
+    <div class="feature-card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg><h3>Batch Statistics</h3><p>MW distribution, Lipinski compliance, data completeness visualized.</p></div>
+    <div class="feature-card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg><h3>Compound Comparison</h3><p>Side-by-side diff table across molecular properties.</p></div>
+    <div class="feature-card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><h3>Session History</h3><p>Save and load ADMET sessions to the cloud.</p></div>
+  </div>
+</div>
+
+<!-- USE CASES -->
+<div class="landing-section reveal" style="position:relative;z-index:1;">
+  <div class="landing-section-label">Built for</div>
+  <h2 class="landing-section-title">Who uses Drug Design Universe?</h2>
+  <div class="landing-usecases">
+    <div class="usecase-card"><div class="usecase-emoji">🎓</div><h3>Pharmacy Students</h3><p>Generate publication-ready Word reports in minutes, not hours.</p></div>
+    <div class="usecase-card"><div class="usecase-emoji">🔬</div><h3>Research Labs</h3><p>Batch-screen compound libraries with one click. Compare side-by-side.</p></div>
+    <div class="usecase-card"><div class="usecase-emoji">💊</div><h3>Drug Discovery Teams</h3><p>Rapidly profile lead candidates — ADMET, toxicity, drug-likeness.</p></div>
+  </div>
+</div>
+
+<!-- CONTACT -->
+<div class="landing-section reveal" style="position:relative;z-index:1;">
+  <div class="landing-section-label">Contact</div>
+  <h2 class="landing-section-title">Get in touch</h2>
+  <div class="landing-contact">
+    <div class="contact-card">
+      <div class="contact-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div>
+      <div><h3>Md Musfiqur Rahaman</h3><p>Dept. of Pharmacy · Daffodil International University</p><a href="mailto:rahaman2311091088@diu.edu.bd" class="contact-email">rahaman2311091088@diu.edu.bd</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- FAQ -->
+<div class="landing-section reveal" style="position:relative;z-index:1;">
+  <div class="landing-section-label">FAQ</div>
+  <h2 class="landing-section-title">Frequently asked questions</h2>
+  <div class="landing-faq">
+    <div class="faq-item"><button class="faq-question" onclick="this.parentElement.classList.toggle('open')"><span>Is Drug Design Universe really free?</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button><div class="faq-answer"><p>Yes, 100% free. No hidden fees, no premium tiers, no usage limits.</p></div></div>
+    <div class="faq-item"><button class="faq-question" onclick="this.parentElement.classList.toggle('open')"><span>Do I need to install anything?</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button><div class="faq-answer"><p>No installation needed. DDU runs entirely in your browser — just open the website and start.</p></div></div>
+    <div class="faq-item"><button class="faq-question" onclick="this.parentElement.classList.toggle('open')"><span>Is my data stored or shared?</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button><div class="faq-answer"><p>Lookups go directly to PubChem. ADMET data is stored only in your browser session and Supabase account. Nothing shared with third parties.</p></div></div>
+    <div class="faq-item"><button class="faq-question" onclick="this.parentElement.classList.toggle('open')"><span>How many compounds can I process?</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button><div class="faq-answer"><p>Up to 50 per PubChem batch. For ADMET reports, up to 60 compounds. Save and reload sessions across batches.</p></div></div>
+    <div class="faq-item"><button class="faq-question" onclick="this.parentElement.classList.toggle('open')"><span>Can I use it without an account?</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button><div class="faq-answer"><p>Yes! Click "Guest Access" and enter the code from your instructor. Full functionality included.</p></div></div>
+    <div class="faq-item"><button class="faq-question" onclick="this.parentElement.classList.toggle('open')"><span>What formats can I export?</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button><div class="faq-answer"><p><strong>Excel (.xlsx)</strong>, <strong>SDF ZIP</strong> with 3D/2D structures, and <strong>Word (.docx)</strong> formatted ADMET reports.</p></div></div>
+  </div>
+</div>
+
+<!-- FINAL CTA -->
+<div class="landing-section landing-cta-section reveal" style="position:relative;z-index:1;">
+  <h2 class="landing-section-title" style="max-width:500px;">Ready to accelerate your drug discovery research?</h2>
+  <p class="landing-subtitle" style="margin-bottom:28px;">Join researchers who trust DDU for fast, reproducible compound profiling.</p>
+  <div class="landing-actions">
+    <button class="btn-primary" onclick="document.getElementById('landingSignIn').click()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg> Start for Free</button>
+    <button class="btn-secondary" onclick="document.getElementById('landingGuest').click()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Guest Access</button>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="landing-footer" style="position:relative;z-index:1;">
+  <div class="landing-footer-links"><a href="https://pubchem.ncbi.nlm.nih.gov/" target="_blank" rel="noopener">PubChem</a><a href="https://www.swissadme.ch/" target="_blank" rel="noopener">SwissADME</a><a href="https://tox-new.charite.de/protox3/" target="_blank" rel="noopener">ProTox-3</a><a href="https://github.com/rahaman2311091088-eng/musfiqsmileseveryday" target="_blank" rel="noopener">GitHub</a></div>
+  <div class="landing-footer-credit">Created by <strong>Md Musfiqur Rahaman</strong> · Dept. of Pharmacy · Daffodil International University<br><a href="mailto:rahaman2311091088@diu.edu.bd" style="color:var(--accent-dim);text-decoration:none;font-size:11px;">rahaman2311091088@diu.edu.bd</a></div>
+  <div class="landing-footer-version">DDU v2.2.0 · Build 2026-06-25</div>
+</div>
+</div></div>
+
+<!-- ═══════════════════════════════════════ -->
+
+<script>
+// Cursor glow
+document.addEventListener('mousemove', function(e) {
+  var glow = document.getElementById('cursorGlow');
+  if (glow) { glow.style.left = e.clientX + 'px'; glow.style.top = e.clientY + 'px'; }
+});
+
+// Scroll reveal
+function landingScrollReveal() {
+  document.querySelectorAll('.reveal').forEach(function(el) {
+    var rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight - 60) el.classList.add('visible');
+  });
+}
+window.addEventListener('scroll', landingScrollReveal, { passive: true });
+window.addEventListener('load', landingScrollReveal);
+setTimeout(landingScrollReveal, 100);
+
+// Animated counter in dashboard preview
+(function() {
+  var compoundEl = document.getElementById('previewCompoundCount');
+  var reportEl = document.getElementById('previewReportCount');
+  if (!compoundEl || !reportEl) return;
+  var cVal = 0, rVal = 0, cTarget = 47, rTarget = 12;
+  function tick() {
+    if (cVal < cTarget) { cVal += Math.ceil((cTarget - cVal) * 0.08); compoundEl.textContent = Math.min(cVal, cTarget); }
+    if (rVal < rTarget) { rVal += Math.ceil((rTarget - rVal) * 0.06); reportEl.textContent = Math.min(rVal, rTarget); }
+    if (cVal < cTarget || rVal < rTarget) requestAnimationFrame(tick);
+  }
+  setTimeout(tick, 800);
+})();
+</script>
+
 
 <!-- ═══════════════════════════════════════ -->
 <!-- AUTH SCREEN                             -->
