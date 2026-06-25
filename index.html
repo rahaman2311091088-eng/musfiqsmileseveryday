@@ -1953,7 +1953,7 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         PubChem Lookup
       </div>
-      <a href="admet.html" class="sidebar-item" style="text-decoration:none;color:inherit;">
+      <a href="/admet" class="sidebar-item" style="text-decoration:none;color:inherit;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         ADMET Profiling ↗
       </a>
@@ -1963,7 +1963,7 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         New Lookup
       </div>
-      <a href="admet.html" class="sidebar-item" id="sidebarGenerateReport" style="text-decoration:none;color:inherit;">
+      <a href="/admet" class="sidebar-item" id="sidebarGenerateReport" style="text-decoration:none;color:inherit;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Generate Report ↗
       </a>
@@ -1991,7 +1991,7 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         Lookup
       </button>
-      <a href="admet.html" class="mobile-nav-item" style="text-decoration:none;color:inherit;">
+      <a href="/admet" class="mobile-nav-item" style="text-decoration:none;color:inherit;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         ADMET ↗
       </a>
@@ -2202,7 +2202,7 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:48px;height:48px;color:var(--accent);margin-bottom:16px;"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
         <h2 style="font-family:var(--font-mono);font-size:20px;margin-bottom:12px;">ADMET Profiling</h2>
         <p style="color:var(--text-dim);font-size:14px;line-height:1.6;margin-bottom:24px;">ADMET profiling has moved to its own dedicated page for better performance and workflow separation.</p>
-        <a href="admet.html" class="btn-primary" style="display:inline-flex;align-items:center;gap:8px;text-decoration:none;">
+        <a href="/admet" class="btn-primary" style="display:inline-flex;align-items:center;gap:8px;text-decoration:none;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
           Open ADMET Profiling →
         </a>
@@ -2454,7 +2454,7 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
   });
 
   document.getElementById('dashNewAdmet')?.addEventListener('click', () => {
-    window.location.href = 'admet.html';
+    window.location.href = '/admet';
   });
 
   document.getElementById('dashSample')?.addEventListener('click', () => {
@@ -2499,8 +2499,8 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
 
   const cmdActions = [
     { label: 'New Compound Lookup', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>', action: () => { setActivePanel('pubchemTab'); cidInput?.focus(); } },
-    { label: 'Add ADMET Compound', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>', action: () => { window.location.href = 'admet.html'; } },
-    { label: 'Generate Report', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>', action: () => { window.location.href = 'admet.html'; } },
+    { label: 'Add ADMET Compound', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>', action: () => { window.location.href = '/admet'; } },
+    { label: 'Generate Report', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>', action: () => { window.location.href = '/admet'; } },
     { label: 'Load Sample Data', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>', action: () => { setActivePanel('pubchemTab'); document.getElementById('sampleBtn')?.click(); } },
     { label: 'Dashboard', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>', action: () => setActivePanel('dashboardPanel') },
     { label: 'Keyboard Shortcuts', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/></svg>', action: () => { kbdPanel.classList.add('open'); cmdPalette.classList.remove('open'); } },
