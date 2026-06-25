@@ -1530,6 +1530,10 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
 .mobile-nav-item.active { color: var(--accent); }
 
 
+/* ═══ MAIN PANELS (tab switching) ═══ */
+.main-panel { display: none; }
+.main-panel.active { display: block; }
+
 /* ═══ DOCKING SCORE FILTER ═══ */
 .docking-drop-zone {
   border: 2px dashed var(--panel-line-solid);
@@ -1790,6 +1794,42 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
     <div class="feature-card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg><h3>Batch Statistics</h3><p>MW distribution, Lipinski compliance, data completeness visualized.</p></div>
     <div class="feature-card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg><h3>Compound Comparison</h3><p>Side-by-side diff table across molecular properties.</p></div>
     <div class="feature-card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><h3>Session History</h3><p>Save and load ADMET sessions to the cloud.</p></div>
+    <div class="feature-card" style="border-color:rgba(127,231,196,0.25);background:rgba(127,231,196,0.04);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/><line x1="12" y1="22" x2="12" y2="15.5"/><polyline points="22 8.5 12 15.5 2 8.5"/></svg><h3>Docking Score Filter</h3><p>Upload docking result files, rank ligands by score, and export top candidates.</p></div>
+    <div class="feature-card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/><line x1="12" y1="22" x2="12" y2="15.5"/><polyline points="22 8.5 12 15.5 2 8.5"/></svg><h3>Multi-Protein Analysis</h3><p>Combine docking results from up to 15 proteins and find best ligands.</p></div>
+  </div>
+</div>
+
+<!-- DOCKING SCORE FILTER HIGHLIGHT -->
+<div class="landing-section reveal" style="position:relative;">
+  <div style="max-width:960px;margin:0 auto;text-align:center;">
+    <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(127,231,196,0.08);border:1px solid rgba(127,231,196,0.15);border-radius:20px;padding:6px 16px;margin-bottom:16px;font-family:var(--font-mono);font-size:11px;color:var(--accent);letter-spacing:0.05em;text-transform:uppercase;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/><line x1="12" y1="22" x2="12" y2="15.5"/><polyline points="22 8.5 12 15.5 2 8.5"/></svg>
+      New Feature
+    </div>
+    <h2 style="font-family:var(--font-mono);font-size:28px;font-weight:700;margin-bottom:12px;">Docking Score <span style="color:var(--accent);">Filter</span></h2>
+    <p style="color:var(--text-dim);font-size:15px;max-width:640px;margin:0 auto 28px;line-height:1.6;">Upload docking result Excel files from multiple proteins, automatically rank ligands by docking score, and identify the best candidates in seconds.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;max-width:760px;margin:0 auto 28px;">
+      <div style="background:var(--glass-bg);border:1px solid var(--glass-border);backdrop-filter:blur(12px);border-radius:var(--radius-lg);padding:18px;text-align:center;">
+        <div style="font-size:28px;margin-bottom:8px;">📁</div>
+        <div style="font-family:var(--font-mono);font-size:13px;font-weight:600;margin-bottom:4px;">Multi-File Upload</div>
+        <div style="font-size:12px;color:var(--text-dim);line-height:1.4;">1–15 Excel files, one per protein target</div>
+      </div>
+      <div style="background:var(--glass-bg);border:1px solid var(--glass-border);backdrop-filter:blur(12px);border-radius:var(--radius-lg);padding:18px;text-align:center;">
+        <div style="font-size:28px;margin-bottom:8px;">🏆</div>
+        <div style="font-family:var(--font-mono);font-size:13px;font-weight:600;margin-bottom:4px;">Smart Ranking</div>
+        <div style="font-size:12px;color:var(--text-dim);line-height:1.4;">Avg & best docking score, protein coverage</div>
+      </div>
+      <div style="background:var(--glass-bg);border:1px solid var(--glass-border);backdrop-filter:blur(12px);border-radius:var(--radius-lg);padding:18px;text-align:center;">
+        <div style="font-size:28px;margin-bottom:8px;">📊</div>
+        <div style="font-family:var(--font-mono);font-size:13px;font-weight:600;margin-bottom:4px;">Export & Integrate</div>
+        <div style="font-size:12px;color:var(--text-dim);line-height:1.4;">Excel, CSV, or send CIDs to PubChem</div>
+      </div>
+      <div style="background:var(--glass-bg);border:1px solid var(--glass-border);backdrop-filter:blur(12px);border-radius:var(--radius-lg);padding:18px;text-align:center;">
+        <div style="font-size:28px;margin-bottom:8px;">⚡</div>
+        <div style="font-family:var(--font-mono);font-size:13px;font-weight:600;margin-bottom:4px;">Auto-Detect</div>
+        <div style="font-size:12px;color:var(--text-dim);line-height:1.4;">Smart column detection across file formats</div>
+      </div>
+    </div>
   </div>
 </div>
 
