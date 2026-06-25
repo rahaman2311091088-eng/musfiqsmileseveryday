@@ -1529,6 +1529,76 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
 .mobile-nav-item svg { width: 20px; height: 20px; }
 .mobile-nav-item.active { color: var(--accent); }
 
+
+/* ═══ DOCKING SCORE FILTER ═══ */
+.docking-drop-zone {
+  border: 2px dashed var(--panel-line-solid);
+  border-radius: var(--radius-md);
+  padding: 32px 24px;
+  text-align: center;
+  transition: all var(--transition-smooth);
+  cursor: pointer;
+  position: relative;
+}
+.docking-drop-zone:hover { border-color: var(--accent-dim); background: rgba(127,231,196,0.03); }
+.docking-drop-zone.drag-over { border-color: var(--accent); background: rgba(127,231,196,0.06); }
+.docking-drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+.docking-file-item {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg-surface); border: 1px solid var(--panel-line-solid);
+  border-radius: var(--radius-sm); padding: 10px 14px;
+  transition: all var(--transition-fast);
+}
+.docking-file-item:hover { border-color: var(--glass-border-hover); }
+.docking-file-icon {
+  width: 32px; height: 32px; border-radius: 6px;
+  background: rgba(240,176,66,0.1); display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.docking-file-icon svg { width: 16px; height: 16px; color: var(--amber); }
+.docking-file-info { flex: 1; min-width: 0; }
+.docking-file-name { font-family: var(--font-mono); font-size: 12.5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.docking-file-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.docking-file-remove {
+  background: none; border: none; color: var(--text-muted); cursor: pointer;
+  padding: 4px; border-radius: 4px; transition: all var(--transition-fast);
+  display: flex; align-items: center; justify-content: center;
+}
+.docking-file-remove:hover { color: var(--error); background: var(--error-glow); }
+.docking-file-remove svg { width: 14px; height: 14px; }
+
+.docking-score-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+  padding: 3px 8px; border-radius: 4px;
+}
+.docking-score-badge.good { background: rgba(127,231,196,0.12); color: var(--accent); }
+.docking-score-badge.moderate { background: rgba(240,176,66,0.12); color: var(--amber); }
+.docking-score-badge.poor { background: rgba(240,104,88,0.1); color: var(--error); }
+
+.docking-protein-tag {
+  display: inline-block; font-family: var(--font-mono); font-size: 10.5px;
+  padding: 2px 7px; border-radius: 3px; margin: 1px 2px;
+  background: rgba(96,165,250,0.1); color: #60A5FA; white-space: nowrap;
+}
+
+.docking-copy-btn {
+  background: none; border: none; cursor: pointer; color: var(--accent-dim);
+  padding: 2px 4px; border-radius: 3px; transition: all var(--transition-fast);
+  display: inline-flex; align-items: center; vertical-align: middle;
+}
+.docking-copy-btn:hover { color: var(--accent); background: rgba(127,231,196,0.08); }
+.docking-copy-btn svg { width: 12px; height: 12px; }
+
+.docking-rank-cell {
+  font-family: var(--font-mono); font-weight: 700; font-size: 14px;
+  width: 60px; text-align: center;
+}
+.docking-rank-1 { color: #FFD700; }
+.docking-rank-2 { color: #C0C0C0; }
+.docking-rank-3 { color: #CD7F32; }
+
 </style>
 </head>
 <body>
@@ -1885,6 +1955,10 @@ setTimeout(landingScrollReveal, 100);
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         ADMET Profiling ↗
       </a>
+      <div class="sidebar-item" data-panel="dockingPanel">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/><line x1="12" y1="22" x2="12" y2="15.5"/><polyline points="22 8.5 12 15.5 2 8.5"/></svg>
+        Docking Filter
+      </div>
 
       <div class="sidebar-section-label">Quick Actions</div>
       <div class="sidebar-item" id="sidebarNewLookup">
@@ -1923,6 +1997,10 @@ setTimeout(landingScrollReveal, 100);
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         ADMET ↗
       </a>
+      <button class="mobile-nav-item" data-panel="dockingPanel">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/><line x1="12" y1="22" x2="12" y2="15.5"/><polyline points="22 8.5 12 15.5 2 8.5"/></svg>
+        Docking
+      </button>
     </div>
 
     <!-- ════════ DASHBOARD PANEL ════════ -->
@@ -1975,6 +2053,10 @@ setTimeout(landingScrollReveal, 100);
           <button class="btn-ghost btn-sm" id="dashSample">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             Try Sample Data
+          </button>
+          <button class="btn-ghost btn-sm" id="dashDocking" style="border-color:var(--accent-dim);color:var(--accent);">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/><line x1="12" y1="22" x2="12" y2="15.5"/><polyline points="22 8.5 12 15.5 2 8.5"/></svg>
+            Docking Filter
           </button>
         </div>
       </div>
@@ -2136,6 +2218,154 @@ setTimeout(landingScrollReveal, 100);
         </a>
       </div>
     </div>
+
+
+    <!-- ════════ DOCKING SCORE FILTER PANEL ════════ -->
+    <div id="dockingPanel" class="main-panel">
+      <div class="main-header">
+        <h1>Docking Score <span>Filter</span></h1>
+        <div class="cmd-palette-trigger" onclick="document.getElementById('cmdPalette').classList.add('open');document.getElementById('cmdInput').focus();">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          Search… <kbd>⌘K</kbd>
+        </div>
+      </div>
+
+      <p style="color:var(--text-dim);font-size:14px;line-height:1.6;margin-bottom:20px;max-width:760px;">
+        Upload docking result Excel files (1 per protein), rank ligands by docking score, and identify the best candidates. No ADMET calculations — pure docking-score-based ranking.
+      </p>
+
+      <!-- Upload Section -->
+      <div class="glass-card" id="dockingUploadCard" style="margin-bottom:20px;">
+        <div class="card-header">
+          <div class="card-label">Upload Docking Results</div>
+          <div class="count-badge" id="dockingFileCount"><b>0</b> / 15 files</div>
+        </div>
+
+        <div class="docking-drop-zone" id="dockingDropZone">
+          <div class="drop-zone-icon">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </div>
+          <div style="font-size:14px;color:var(--text-dim);margin-bottom:4px;">
+            Drag & drop <strong>.xlsx</strong> files here, or click to browse
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);">Each file = 1 protein · Max 15 files</div>
+          <input type="file" id="dockingFileInput" accept=".xlsx,.xls" multiple>
+        </div>
+
+        <!-- File List -->
+        <div id="dockingFileList" style="margin-top:14px;display:none;">
+          <div style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-dim);margin-bottom:10px;">Uploaded Proteins</div>
+          <div id="dockingFileItems" style="display:flex;flex-direction:column;gap:6px;"></div>
+        </div>
+
+        <!-- Top N Selector + Process Button -->
+        <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap;align-items:center;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label style="font-family:var(--font-mono);font-size:12px;color:var(--text-dim);white-space:nowrap;">Show Top</label>
+            <select id="dockingTopN" style="width:90px;padding:10px 12px;font-size:13px;">
+              <option value="5">Top 5</option>
+              <option value="10" selected>Top 10</option>
+              <option value="15">Top 15</option>
+              <option value="20">Top 20</option>
+              <option value="25">Top 25</option>
+              <option value="50">Top 50</option>
+            </select>
+          </div>
+          <button class="btn-accent" id="dockingProcessBtn" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/><line x1="12" y1="22" x2="12" y2="15.5"/><polyline points="22 8.5 12 15.5 2 8.5"/></svg>
+            Analyze & Rank
+          </button>
+          <button class="btn-ghost" id="dockingClearBtn">Clear All</button>
+        </div>
+      </div>
+
+      <!-- Progress -->
+      <div class="progress-wrap" id="dockingProgress">
+        <div class="progress-label"><span id="dockingProgressText">Processing…</span><span id="dockingProgressCount">0 / 0</span></div>
+        <div class="progress-track"><div class="progress-fill" id="dockingProgressFill"></div></div>
+      </div>
+
+      <!-- State Box -->
+      <div class="state-box" id="dockingStateBox"><div class="state-text" id="dockingStateText"></div></div>
+
+      <!-- Results Section -->
+      <div id="dockingResultsWrap" style="display:none;margin-top:24px;">
+        <div class="results-header">
+          <div class="results-title" id="dockingResultsTitle"></div>
+          <div class="dl-btn-group">
+            <button class="btn-accent btn-sm" id="dockingSendPubchemBtn" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              Open in PubChem / ADMET
+            </button>
+            <button class="btn-amber btn-sm" id="dockingExportXlsxBtn" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+              Export Excel (.xlsx)
+            </button>
+            <button class="btn-ghost btn-sm" id="dockingExportCsvBtn" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="stats-row" id="dockingSummaryStats" style="margin-bottom:20px;display:none;">
+          <div class="stat-card">
+            <div class="stat-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/></svg></div>
+            <div class="stat-number" id="dockingStatLigands">0</div>
+            <div class="stat-label">Total Unique Ligands</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+            <div class="stat-number" id="dockingStatProteins">0</div>
+            <div class="stat-label">Proteins Analyzed</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+            <div class="stat-number" id="dockingStatBestScore">—</div>
+            <div class="stat-label">Best Docking Score</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+            <div class="stat-number" id="dockingStatAvgScore">—</div>
+            <div class="stat-label">Avg Score (Top N)</div>
+          </div>
+        </div>
+
+        <!-- Table Toolbar -->
+        <div class="table-toolbar" id="dockingTableToolbar">
+          <div class="table-search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="dockingTableSearch" placeholder="Filter by ligand name, CID, protein…">
+          </div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);">Click headers to sort · Click CID/Name to copy</div>
+        </div>
+
+        <!-- Results Table -->
+        <div class="table-card">
+          <div class="table-scroll">
+            <table id="dockingResultsTable">
+              <thead>
+                <tr>
+                  <th class="sortable" data-sort="rank" style="width:60px;">Rank</th>
+                  <th class="sortable" data-sort="name">Ligand Name</th>
+                  <th class="sortable" data-sort="cid">PubChem CID</th>
+                  <th class="sortable" data-sort="avgScore">Avg Docking Score</th>
+                  <th class="sortable" data-sort="bestScore">Best Docking Score</th>
+                  <th class="sortable" data-sort="coverage">Protein Coverage</th>
+                  <th>Protein List</th>
+                </tr>
+              </thead>
+              <tbody id="dockingResultsBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination" id="dockingPagination"></div>
+      </div>
+    </div>
+
 
     <!-- Footer -->
     <footer style="margin-top:48px;font-size:12px;color:var(--text-muted);text-align:center;padding-bottom:20px;">
@@ -2388,6 +2618,10 @@ setTimeout(landingScrollReveal, 100);
   document.getElementById('dashNewLookup')?.addEventListener('click', () => {
     setActivePanel('pubchemTab');
     document.getElementById('cidInput')?.focus();
+  });
+
+  document.getElementById('dashDocking')?.addEventListener('click', () => {
+    if (typeof setActivePanel === 'function') setActivePanel('dockingPanel');
   });
 
   document.getElementById('dashNewAdmet')?.addEventListener('click', () => {
@@ -3617,6 +3851,595 @@ setTimeout(landingScrollReveal, 100);
 
 </script>
 
+
+
+
+<script>
+/* ═══════════════════════════════════════════════════
+   DOCKING SCORE FILTER MODULE
+   Pure docking-score-based ligand ranking
+   ═══════════════════════════════════════════════════ */
+(function() {
+  'use strict';
+
+  // ─── State ───
+  let dockingFiles = [];       // { name, data, sheetData }
+  let dockingResults = [];     // ranked results
+  let dockingFiltered = [];    // after search filter
+  let dockingSortCol = 'rank';
+  let dockingSortDir = 'asc';
+  let dockingCurrentPage = 1;
+  const DOCKING_PAGE_SIZE = 15;
+
+  // ─── DOM Refs ───
+  const dropZone = document.getElementById('dockingDropZone');
+  const fileInput = document.getElementById('dockingFileInput');
+  const fileListEl = document.getElementById('dockingFileList');
+  const fileItemsEl = document.getElementById('dockingFileItems');
+  const fileCountBadge = document.getElementById('dockingFileCount');
+  const topNSelect = document.getElementById('dockingTopN');
+  const processBtn = document.getElementById('dockingProcessBtn');
+  const clearBtn = document.getElementById('dockingClearBtn');
+  const progressWrap = document.getElementById('dockingProgress');
+  const progressText = document.getElementById('dockingProgressText');
+  const progressCount = document.getElementById('dockingProgressCount');
+  const progressFill = document.getElementById('dockingProgressFill');
+  const stateBox = document.getElementById('dockingStateBox');
+  const stateText = document.getElementById('dockingStateText');
+  const resultsWrap = document.getElementById('dockingResultsWrap');
+  const resultsTitle = document.getElementById('dockingResultsTitle');
+  const resultsBody = document.getElementById('dockingResultsBody');
+  const tableToolbar = document.getElementById('dockingTableToolbar');
+  const searchInput = document.getElementById('dockingTableSearch');
+  const summaryStats = document.getElementById('dockingSummaryStats');
+  const sendPubchemBtn = document.getElementById('dockingSendPubchemBtn');
+  const exportXlsxBtn = document.getElementById('dockingExportXlsxBtn');
+  const exportCsvBtn = document.getElementById('dockingExportCsvBtn');
+
+  // ─── Column Name Detection ───
+  const LIGAND_NAMES = ['ligand name','ligand','compound','compound name','molecule','molecule name','ligand_id','ligandid','name','title','compound_name'];
+  const CID_NAMES = ['pubchem cid','cid','pubchem_cid','pubchemcid','compound cid','compound_cid','pcid'];
+  const SCORE_NAMES = ['docking score','binding energy','affinity','score','binding affinity','vina score','dock score','dscore','energy','delta g','δg','kcal/mol','binding_score','docking_score'];
+
+  function normalizeCol(name) {
+    return (name || '').toString().toLowerCase().trim().replace(/[_\-\s]+/g, ' ').replace(/[^a-z0-9 ]/g, '');
+  }
+
+  function findCol(headers, candidates) {
+    for (const h of headers) {
+      const n = normalizeCol(h);
+      for (const c of candidates) {
+        if (n === c || n.includes(c)) return h;
+      }
+    }
+    return null;
+  }
+
+  // ─── File Upload ───
+  function updateFileUI() {
+    const count = dockingFiles.length;
+    fileCountBadge.innerHTML = '<b>' + count + '</b> / 15 files';
+    fileCountBadge.classList.toggle('over', count > 15);
+    processBtn.disabled = count === 0;
+
+    if (count === 0) {
+      fileListEl.style.display = 'none';
+      fileItemsEl.innerHTML = '';
+      return;
+    }
+
+    fileListEl.style.display = '';
+    fileItemsEl.innerHTML = dockingFiles.map((f, i) => {
+      const rows = f.sheetData ? f.sheetData.length : 0;
+      return '<div class="docking-file-item" data-idx="' + i + '">' +
+        '<div class="docking-file-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>' +
+        '<div class="docking-file-info">' +
+          '<div class="docking-file-name">' + escapeHtml(f.name) + '</div>' +
+          '<div class="docking-file-meta">' + rows + ' rows · ' + formatSize(f.size) + '</div>' +
+        '</div>' +
+        '<button class="docking-file-remove" data-idx="' + i + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
+      '</div>';
+    }).join('');
+
+    fileItemsEl.querySelectorAll('.docking-file-remove').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.dataset.idx);
+        dockingFiles.splice(idx, 1);
+        updateFileUI();
+      });
+    });
+  }
+
+  function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
+  }
+
+  async function readExcelFile(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const wb = XLSX.read(data, { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
+          resolve(json);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  async function handleFiles(files) {
+    const fileArray = Array.from(files).filter(f => /\.(xlsx|xls)$/i.test(f.name));
+    if (fileArray.length === 0) {
+      if (typeof showToast === 'function') showToast('Invalid file', 'Please upload .xlsx files only.', 'error');
+      return;
+    }
+
+    const remaining = 15 - dockingFiles.length;
+    if (remaining <= 0) {
+      if (typeof showToast === 'function') showToast('Limit reached', 'Maximum 15 files allowed.', 'error');
+      return;
+    }
+
+    const toProcess = fileArray.slice(0, remaining);
+
+    for (const file of toProcess) {
+      try {
+        const sheetData = await readExcelFile(file);
+        const proteinName = file.name.replace(/\.(xlsx|xls)$/i, '');
+        dockingFiles.push({ name: proteinName, size: file.size, sheetData });
+      } catch (err) {
+        if (typeof showToast === 'function') showToast('Read error', 'Failed to read ' + file.name + ': ' + err.message, 'error');
+      }
+    }
+
+    updateFileUI();
+  }
+
+  // Drop zone events
+  if (dropZone) {
+    dropZone.addEventListener('click', () => fileInput?.click());
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('drag-over');
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      handleFiles(e.dataTransfer.files);
+    });
+  }
+
+  if (fileInput) {
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length > 0) handleFiles(fileInput.files);
+      fileInput.value = '';
+    });
+  }
+
+  // ─── Process & Rank ───
+  processBtn?.addEventListener('click', processDockingFiles);
+
+  async function processDockingFiles() {
+    if (dockingFiles.length === 0) return;
+
+    // Show progress
+    progressWrap.classList.add('active');
+    stateBox.classList.remove('active');
+    resultsWrap.style.display = 'none';
+    progressText.textContent = 'Reading files…';
+    progressFill.style.width = '0%';
+
+    try {
+      const allRows = [];
+      const totalFiles = dockingFiles.length;
+
+      for (let i = 0; i < totalFiles; i++) {
+        const f = dockingFiles[i];
+        progressText.textContent = 'Processing ' + f.name + '…';
+        progressCount.textContent = (i + 1) + ' / ' + totalFiles;
+        progressFill.style.width = ((i + 1) / totalFiles * 50) + '%;
+
+        const headers = f.sheetData.length > 0 ? Object.keys(f.sheetData[0]) : [];
+        const ligandCol = findCol(headers, LIGAND_NAMES);
+        const cidCol = findCol(headers, CID_NAMES);
+        const scoreCol = findCol(headers, SCORE_NAMES);
+
+        if (!scoreCol) {
+          if (typeof showToast === 'function') showToast('Missing score column', f.name + ': No docking score column detected.', 'error');
+          continue;
+        }
+
+        for (const row of f.sheetData) {
+          const scoreVal = parseFloat(row[scoreCol]);
+          if (isNaN(scoreVal)) continue;
+
+          allRows.push({
+            ligandName: ligandCol ? String(row[ligandCol] || '').trim() : '',
+            cid: cidCol ? String(row[cidCol] || '').trim() : '',
+            score: scoreVal,
+            protein: f.name
+          });
+        }
+      }
+
+      if (allRows.length === 0) {
+        stateBox.classList.add('active');
+        stateText.textContent = 'No valid docking data found. Ensure files contain recognizable column headers (Ligand Name, Docking Score, CID, etc.).';
+        progressWrap.classList.remove('active');
+        return;
+      }
+
+      progressText.textContent = 'Ranking ligands…';
+      progressFill.style.width = '75%';
+
+      // ─── Aggregate by ligand ───
+      const ligandMap = {};
+      for (const row of allRows) {
+        // Use ligandName as key; fallback to CID; fallback to combined
+        const key = row.ligandName || row.cid || ('unknown_' + Math.random().toString(36).slice(2, 8));
+        if (!ligandMap[key]) {
+          ligandMap[key] = {
+            ligandName: row.ligandName || key,
+            cid: row.cid || '',
+            scores: [],
+            proteins: []
+          };
+        }
+        ligandMap[key].scores.push(row.score);
+        if (!ligandMap[key].proteins.includes(row.protein)) {
+          ligandMap[key].proteins.push(row.protein);
+        }
+        // If we have a CID later but not before, keep it
+        if (!ligandMap[key].cid && row.cid) ligandMap[key].cid = row.cid;
+      }
+
+      // Calculate averages & best
+      const ligands = Object.values(ligandMap).map(l => {
+        const avgScore = l.scores.reduce((a, b) => a + b, 0) / l.scores.length;
+        const bestScore = Math.min(...l.scores); // most negative = best
+        return {
+          ligandName: l.ligandName,
+          cid: l.cid,
+          avgScore: Math.round(avgScore * 100) / 100,
+          bestScore: Math.round(bestScore * 100) / 100,
+          proteinCount: l.proteins.length,
+          totalProteins: totalFiles,
+          proteinList: l.proteins,
+          coverage: Math.round((l.proteins.length / totalFiles) * 100)
+        };
+      });
+
+      // Sort by lowest average docking score (most negative)
+      ligands.sort((a, b) => a.avgScore - b.avgScore);
+
+      // Assign ranks
+      ligands.forEach((l, i) => l.rank = i + 1);
+
+      dockingResults = ligands;
+      dockingFiltered = ligands;
+      dockingSortCol = 'rank';
+      dockingSortDir = 'asc';
+      dockingCurrentPage = 1;
+
+      progressFill.style.width = '100%';
+      progressText.textContent = 'Done!';
+
+      setTimeout(() => {
+        progressWrap.classList.remove('active');
+        renderResults();
+      }, 400);
+
+      if (typeof incrementStat === 'function') {
+        incrementStat('compounds', dockingResults.length);
+        incrementStat('workflows', 1);
+      }
+
+    } catch (err) {
+      stateBox.classList.add('active');
+      stateBox.classList.add('error');
+      stateText.textContent = 'Error: ' + err.message;
+      progressWrap.classList.remove('active');
+    }
+  }
+
+  // ─── Render Results ───
+  function renderResults() {
+    const topN = parseInt(topNSelect.value) || 10;
+    const displayData = dockingFiltered.slice(0, topN);
+
+    resultsWrap.style.display = '';
+    tableToolbar.style.display = '';
+    summaryStats.style.display = '';
+
+    // Summary stats
+    document.getElementById('dockingStatLigands').textContent = dockingResults.length;
+    document.getElementById('dockingStatProteins').textContent = dockingFiles.length;
+    const bestScore = dockingResults.length > 0 ? dockingResults[0].bestScore : '—';
+    document.getElementById('dockingStatBestScore').textContent = bestScore;
+    const avgOfTopN = displayData.length > 0
+      ? Math.round(displayData.reduce((s, l) => s + l.avgScore, 0) / displayData.length * 100) / 100
+      : '—';
+    document.getElementById('dockingStatAvgScore').textContent = avgOfTopN;
+
+    // Results title
+    resultsTitle.innerHTML = '<b>' + displayData.length + '</b> ligands ranked from <b>' + dockingResults.length + '</b> total';
+
+    // Enable buttons
+    sendPubchemBtn.disabled = false;
+    exportXlsxBtn.disabled = false;
+    exportCsvBtn.disabled = false;
+
+    renderTable(displayData);
+  }
+
+  function renderTable(data) {
+    const topN = parseInt(topNSelect.value) || 10;
+    const totalItems = data.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / DOCKING_PAGE_SIZE));
+    if (dockingCurrentPage > totalPages) dockingCurrentPage = totalPages;
+
+    const start = (dockingCurrentPage - 1) * DOCKING_PAGE_SIZE;
+    const pageData = data.slice(start, start + DOCKING_PAGE_SIZE);
+
+    resultsBody.innerHTML = pageData.map(l => {
+      const rankClass = l.rank <= 3 ? ' docking-rank-' + l.rank : '';
+      const scoreClass = l.avgScore <= -8 ? 'good' : l.avgScore <= -5 ? 'moderate' : 'poor';
+      const bestClass = l.bestScore <= -8 ? 'good' : l.bestScore <= -5 ? 'moderate' : 'poor';
+      const proteinTags = l.proteinList.map(p => '<span class="docking-protein-tag">' + escapeHtml(p) + '</span>').join(' ');
+
+      return '<tr>' +
+        '<td class="docking-rank-cell' + rankClass + '">' +
+          (l.rank <= 3 ? ['🥇','🥈','🥉'][l.rank - 1] : '#' + l.rank) +
+        '</td>' +
+        '<td>' +
+          escapeHtml(l.ligandName) +
+          ' <button class="docking-copy-btn" title="Copy ligand name" data-copy="' + escapeHtml(l.ligandName) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>' +
+        '</td>' +
+        '<td>' +
+          (l.cid ? '<span style="font-family:var(--font-mono);color:var(--amber);font-weight:600;">' + escapeHtml(l.cid) + '</span> <button class="docking-copy-btn" title="Copy CID" data-copy="' + escapeHtml(l.cid) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>' : '<span style="color:var(--text-muted);">—</span>') +
+        '</td>' +
+        '<td><span class="docking-score-badge ' + scoreClass + '">' + l.avgScore.toFixed(2) + '</span></td>' +
+        '<td><span class="docking-score-badge ' + bestClass + '">' + l.bestScore.toFixed(2) + '</span></td>' +
+        '<td>' + l.proteinCount + ' / ' + l.totalProteins + ' <span style="color:var(--text-muted);font-size:11px;">(' + l.coverage + '%)</span></td>' +
+        '<td>' + proteinTags + '</td>' +
+      '</tr>';
+    }).join('');
+
+    // Copy buttons
+    resultsBody.querySelectorAll('.docking-copy-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const text = btn.dataset.copy;
+        navigator.clipboard.writeText(text).then(() => {
+          if (typeof showToast === 'function') showToast('Copied', '"' + text + '" copied to clipboard.', 'success');
+          else { btn.style.color = 'var(--accent)'; setTimeout(() => btn.style.color = '', 800); }
+        });
+      });
+    });
+
+    // Pagination
+    renderPagination(totalItems, totalPages);
+  }
+
+  function renderPagination(totalItems, totalPages) {
+    const paginationEl = document.getElementById('dockingPagination');
+    if (totalPages <= 1) { paginationEl.innerHTML = ''; return; }
+
+    let controlsHtml = '';
+    controlsHtml += '<button ' + (dockingCurrentPage <= 1 ? 'disabled' : '') + ' data-page="prev">← Prev</button>';
+
+    const maxVisible = 5;
+    let startP = Math.max(1, dockingCurrentPage - Math.floor(maxVisible / 2));
+    let endP = Math.min(totalPages, startP + maxVisible - 1);
+    if (endP - startP < maxVisible - 1) startP = Math.max(1, endP - maxVisible + 1);
+
+    for (let p = startP; p <= endP; p++) {
+      controlsHtml += '<button class="' + (p === dockingCurrentPage ? 'active' : '') + '" data-page="' + p + '">' + p + '</button>';
+    }
+
+    controlsHtml += '<button ' + (dockingCurrentPage >= totalPages ? 'disabled' : '') + ' data-page="next">Next →</button>';
+
+    const startItem = (dockingCurrentPage - 1) * DOCKING_PAGE_SIZE + 1;
+    const endItem = Math.min(dockingCurrentPage * DOCKING_PAGE_SIZE, totalItems);
+
+    paginationEl.innerHTML =
+      '<span class="pagination-info">Showing ' + startItem + '–' + endItem + ' of ' + totalItems + '</span>' +
+      '<div class="pagination-controls">' + controlsHtml + '</div>';
+
+    paginationEl.querySelectorAll('button[data-page]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = btn.dataset.page;
+        if (val === 'prev') dockingCurrentPage = Math.max(1, dockingCurrentPage - 1);
+        else if (val === 'next') dockingCurrentPage = Math.min(totalPages, dockingCurrentPage + 1);
+        else dockingCurrentPage = parseInt(val);
+        const topN = parseInt(topNSelect.value) || 10;
+        renderTable(dockingFiltered.slice(0, topN));
+      });
+    });
+  }
+
+  // ─── Table Sorting ───
+  document.querySelectorAll('#dockingResultsTable thead th.sortable').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.sort;
+      if (dockingSortCol === col) {
+        dockingSortDir = dockingSortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        dockingSortCol = col;
+        dockingSortDir = col === 'rank' || col === 'avgScore' || col === 'bestScore' ? 'asc' : 'asc';
+      }
+
+      // Update header classes
+      document.querySelectorAll('#dockingResultsTable thead th.sortable').forEach(h => {
+        h.classList.remove('sort-asc', 'sort-desc');
+      });
+      th.classList.add(dockingSortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+
+      const topN = parseInt(topNSelect.value) || 10;
+      dockingFiltered.sort((a, b) => {
+        let va, vb;
+        switch (col) {
+          case 'rank': va = a.rank; vb = b.rank; break;
+          case 'name': va = a.ligandName.toLowerCase(); vb = b.ligandName.toLowerCase(); break;
+          case 'cid': va = a.cid; vb = b.cid; break;
+          case 'avgScore': va = a.avgScore; vb = b.avgScore; break;
+          case 'bestScore': va = a.bestScore; vb = b.bestScore; break;
+          case 'coverage': va = a.proteinCount; vb = b.proteinCount; break;
+          default: va = 0; vb = 0;
+        }
+        if (typeof va === 'string') {
+          return dockingSortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+        }
+        return dockingSortDir === 'asc' ? va - vb : vb - va;
+      });
+
+      dockingCurrentPage = 1;
+      renderTable(dockingFiltered.slice(0, topN));
+    });
+  });
+
+  // ─── Search/Filter ───
+  searchInput?.addEventListener('input', () => {
+    const q = searchInput.value.toLowerCase().trim();
+    if (!q) {
+      dockingFiltered = [...dockingResults];
+    } else {
+      dockingFiltered = dockingResults.filter(l =>
+        l.ligandName.toLowerCase().includes(q) ||
+        l.cid.toLowerCase().includes(q) ||
+        l.proteinList.some(p => p.toLowerCase().includes(q))
+      );
+    }
+    dockingCurrentPage = 1;
+    const topN = parseInt(topNSelect.value) || 10;
+    renderTable(dockingFiltered.slice(0, topN));
+  });
+
+  // ─── Top N change ───
+  topNSelect?.addEventListener('change', () => {
+    if (dockingResults.length > 0) {
+      dockingCurrentPage = 1;
+      renderResults();
+    }
+  });
+
+  // ─── Clear All ───
+  clearBtn?.addEventListener('click', () => {
+    dockingFiles = [];
+    dockingResults = [];
+    dockingFiltered = [];
+    updateFileUI();
+    progressWrap.classList.remove('active');
+    stateBox.classList.remove('active');
+    resultsWrap.style.display = 'none';
+    if (searchInput) searchInput.value = '';
+  });
+
+  // ─── Export Excel ───
+  exportXlsxBtn?.addEventListener('click', () => {
+    const topN = parseInt(topNSelect.value) || 10;
+    const data = dockingFiltered.slice(0, topN);
+    if (data.length === 0) return;
+
+    const wsData = [
+      ['Rank', 'Ligand Name', 'PubChem CID', 'Avg Docking Score', 'Best Docking Score', 'Protein Coverage', 'Coverage %', 'Protein List']
+    ];
+    for (const l of data) {
+      wsData.push([
+        l.rank,
+        l.ligandName,
+        l.cid,
+        l.avgScore,
+        l.bestScore,
+        l.proteinCount + ' / ' + l.totalProteins,
+        l.coverage + '%',
+        l.proteinList.join('; ')
+      ]);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols'] = [{wch:6},{wch:30},{wch:14},{wch:18},{wch:18},{wch:16},{wch:12},{wch:50}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Docking Results');
+    XLSX.writeFile(wb, 'docking_score_filter_top' + topN + '.xlsx');
+
+    if (typeof showToast === 'function') showToast('Exported', 'Excel file downloaded.', 'success');
+  });
+
+  // ─── Export CSV ───
+  exportCsvBtn?.addEventListener('click', () => {
+    const topN = parseInt(topNSelect.value) || 10;
+    const data = dockingFiltered.slice(0, topN);
+    if (data.length === 0) return;
+
+    const rows = [['Rank','Ligand Name','PubChem CID','Avg Docking Score','Best Docking Score','Protein Coverage','Coverage %','Protein List']];
+    for (const l of data) {
+      rows.push([l.rank, '"'+l.ligandName.replace(/"/g,'""')+'"', l.cid, l.avgScore, l.bestScore, l.proteinCount+'/'+l.totalProteins, l.coverage+'%', '"'+l.proteinList.join('; ').replace(/"/g,'""')+'"']);
+    }
+    const csv = rows.map(r => r.join(',')).join('
+');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'docking_score_filter_top' + topN + '.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+
+    if (typeof showToast === 'function') showToast('Exported', 'CSV file downloaded.', 'success');
+  });
+
+  // ─── Send to PubChem Module ───
+  sendPubchemBtn?.addEventListener('click', () => {
+    const topN = parseInt(topNSelect.value) || 10;
+    const data = dockingFiltered.slice(0, topN);
+    const cids = data.filter(l => l.cid).map(l => l.cid);
+
+    if (cids.length === 0) {
+      if (typeof showToast === 'function') showToast('No CIDs', 'None of the top ligands have PubChem CIDs. Enter CIDs manually in PubChem Lookup.', 'info');
+      return;
+    }
+
+    // Switch to PubChem tab and populate
+    if (typeof setActivePanel === 'function') setActivePanel('pubchemTab');
+
+    const cidInputEl = document.getElementById('cidInput');
+    if (cidInputEl) {
+      cidInputEl.value = cids.join('
+');
+      cidInputEl.dispatchEvent(new Event('input'));
+    }
+
+    if (typeof showToast === 'function') showToast('CIDs loaded', cids.length + ' CIDs sent to PubChem Lookup. Click "Fetch all" to process.', 'success');
+  });
+
+  // ─── Command palette action ───
+  if (typeof cmdActions !== 'undefined') {
+    cmdActions.push({
+      label: 'Docking Score Filter',
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/><line x1="12" y1="22" x2="12" y2="15.5"/><polyline points="22 8.5 12 15.5 2 8.5"/></svg>',
+      action: () => { if (typeof setActivePanel === 'function') setActivePanel('dockingPanel'); }
+    });
+  }
+
+})();
+</script>
 
 
 </body>
