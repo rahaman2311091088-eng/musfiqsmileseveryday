@@ -1972,8 +1972,8 @@ body {
   }
 
   function showAuth() {
-    appScreen.classList.remove('active');
-    authScreen.style.display = 'block';
+    // Redirect to main page landing on sign-out
+    window.location.href = '/';
   }
 
   supabaseClient.auth.onAuthStateChange((event, session) => {

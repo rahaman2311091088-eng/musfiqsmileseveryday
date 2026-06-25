@@ -2395,7 +2395,10 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
 
   function showAuth() {
     appScreen.classList.remove('active');
-    authScreen.style.display = 'block';
+    authScreen.style.display = 'none';
+    // Show landing page instead of auth screen
+    var _lp = document.getElementById('landingPage');
+    if (_lp) _lp.style.display = '';
   }
 
   supabaseClient.auth.onAuthStateChange((event, session) => {
