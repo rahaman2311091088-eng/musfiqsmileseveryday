@@ -1806,7 +1806,8 @@ body {
   <footer style="margin-top:48px;font-size:12px;color:var(--text-muted);text-align:center;padding-bottom:20px;">
     Data via <a href="https://pubchem.ncbi.nlm.nih.gov/" target="_blank" rel="noopener" style="color:var(--accent-dim);text-decoration:none;">PubChem</a> · <a href="https://www.swissadme.ch/" target="_blank" rel="noopener" style="color:var(--accent-dim);text-decoration:none;">SwissADME</a> · <a href="https://tox-new.charite.de/protox3/" target="_blank" rel="noopener" style="color:var(--accent-dim);text-decoration:none;">ProTox-3</a>
     <br>
-    Created by <strong style="color:var(--text-dim)">Md Musfiqur Rahaman</strong> · Dept. of Pharmacy · Daffodil International University
+    Created by <strong style="color:var(--text-dim)">Md Musfiqur Rahaman</strong> · Dept. of Pharmacy · Daffodil International University<br>
+    <a href="mailto:rahaman2311091088@diu.edu.bd" style="color:var(--accent-dim);text-decoration:none;font-size:11px;">rahaman2311091088@diu.edu.bd</a>
     <br>
     <span style="font-size:10.5px;">DDU v2.2.0 · Build 2026-06-25</span>
   </footer>
@@ -1960,8 +1961,13 @@ body {
   function showApp(user) {
     currentUser = user;
     authScreen.style.display = 'none';
+    var _lp = document.getElementById('landingPage');
+    if (_lp) _lp.style.display = 'none';
     appScreen.classList.add('active');
     userEmailLabel.textContent = (user.email === GUEST_EMAIL) ? 'Guest' : user.email;
+    var _av = document.getElementById('userAvatar');
+    if (_av) _av.textContent = (user.email === GUEST_EMAIL ? 'G' : user.email.charAt(0).toUpperCase());
+    if (typeof updateDashboardStats === 'function') updateDashboardStats();
     if (typeof admetHistoryLoad === 'function') admetHistoryLoad();
   }
 

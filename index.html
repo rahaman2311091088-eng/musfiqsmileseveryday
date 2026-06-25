@@ -452,6 +452,42 @@ body {
 }
 .faq-answer strong { color: var(--text); }
 
+/* ═══ CONTACT ═══ */
+.landing-contact {
+  width: 100%; max-width: 600px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.contact-card {
+  display: flex; align-items: flex-start; gap: 18px;
+  padding: 24px; border-radius: var(--radius-lg);
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px);
+  transition: all var(--transition-smooth);
+}
+.contact-card:hover {
+  border-color: var(--glass-border-hover);
+  transform: translateY(-2px); box-shadow: var(--shadow-glow);
+}
+.contact-icon {
+  width: 48px; height: 48px; border-radius: 14px;
+  background: rgba(127,231,196,0.08); border: 1px solid rgba(127,231,196,0.15);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.contact-icon svg { width: 24px; height: 24px; color: var(--accent); }
+.contact-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.contact-card p { font-size: 13px; color: var(--text-dim); line-height: 1.5; margin-bottom: 8px; }
+.contact-email {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 13px; font-weight: 600;
+  color: var(--accent); text-decoration: none;
+  padding: 6px 14px; border-radius: var(--radius-sm);
+  background: rgba(127,231,196,0.06); border: 1px solid rgba(127,231,196,0.15);
+  transition: all var(--transition-fast);
+}
+.contact-email:hover {
+  background: rgba(127,231,196,0.12); border-color: rgba(127,231,196,0.3);
+}
+
 /* ═══ CTA SECTION ═══ */
 .landing-cta-section {
   padding: 48px 24px; border-radius: var(--radius-lg);
@@ -1750,43 +1786,20 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
     </div>
   </div>
 
-  <!-- ═══ TESTIMONIALS ═══ -->
+  <!-- ═══ CONTACT ═══ -->
   <div class="landing-section">
-    <div class="landing-section-label">Testimonials</div>
-    <h2 class="landing-section-title">Trusted by researchers worldwide</h2>
+    <div class="landing-section-label">Contact</div>
+    <h2 class="landing-section-title">Get in touch</h2>
 
-    <div class="landing-testimonials">
-      <div class="testimonial-card">
-        <div class="testimonial-stars">★★★★★</div>
-        <p class="testimonial-text">"I used to spend hours manually formatting ADMET tables for my thesis. DDU generates the complete Word report in seconds — properly formatted with all tables and abbreviations."</p>
-        <div class="testimonial-author">
-          <div class="testimonial-avatar">F</div>
-          <div>
-            <div class="testimonial-name">Farzana Akter</div>
-            <div class="testimonial-role">M.Pharm Student, DIU</div>
-          </div>
+    <div class="landing-contact">
+      <div class="contact-card">
+        <div class="contact-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
         </div>
-      </div>
-      <div class="testimonial-card">
-        <div class="testimonial-stars">★★★★★</div>
-        <p class="testimonial-text">"The batch lookup with drag-and-drop Excel upload is a game changer. I loaded 50 compound CIDs and got structures, SMILES, and molecular weights instantly."</p>
-        <div class="testimonial-author">
-          <div class="testimonial-avatar">R</div>
-          <div>
-            <div class="testimonial-name">Rakib Hossain</div>
-            <div class="testimonial-role">Research Assistant, Dept. of Pharmacy</div>
-          </div>
-        </div>
-      </div>
-      <div class="testimonial-card">
-        <div class="testimonial-stars">★★★★★</div>
-        <p class="testimonial-text">"The SwissADME paste parser is brilliant — just copy the output from the website, paste it, and all 26 fields are auto-filled. No more manual data entry errors."</p>
-        <div class="testimonial-author">
-          <div class="testimonial-avatar">S</div>
-          <div>
-            <div class="testimonial-name">Dr. Samira Khan</div>
-            <div class="testimonial-role">Associate Professor, Pharmacology</div>
-          </div>
+        <div>
+          <h3>Md Musfiqur Rahaman</h3>
+          <p>Dept. of Pharmacy · Daffodil International University</p>
+          <a href="mailto:rahaman2311091088@diu.edu.bd" class="contact-email">rahaman2311091088@diu.edu.bd</a>
         </div>
       </div>
     </div>
@@ -1880,7 +1893,8 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
       <a href="https://github.com/rahaman2311091088-eng/musfiqsmileseveryday" target="_blank" rel="noopener">GitHub</a>
     </div>
     <div class="landing-footer-credit">
-      Created by <strong>Md Musfiqur Rahaman</strong> · Dept. of Pharmacy · Daffodil International University
+      Created by <strong>Md Musfiqur Rahaman</strong> · Dept. of Pharmacy · Daffodil International University<br>
+      <a href="mailto:rahaman2311091088@diu.edu.bd" style="color:var(--accent-dim);text-decoration:none;font-size:11px;">rahaman2311091088@diu.edu.bd</a>
     </div>
     <div class="landing-footer-version">DDU v2.2.0 · Build 2026-06-25</div>
   </div>
@@ -2368,8 +2382,14 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
   function showApp(user) {
     currentUser = user;
     authScreen.style.display = 'none';
+    // Hide landing page if it exists (it may not on the ADMET page)
+    var _lp = document.getElementById('landingPage');
+    if (_lp) _lp.style.display = 'none';
     appScreen.classList.add('active');
     userEmailLabel.textContent = (user.email === GUEST_EMAIL) ? 'Guest' : user.email;
+    var _av = document.getElementById('userAvatar');
+    if (_av) _av.textContent = (user.email === GUEST_EMAIL ? 'G' : user.email.charAt(0).toUpperCase());
+    if (typeof updateDashboardStats === 'function') updateDashboardStats();
     if (typeof admetHistoryLoad === 'function') admetHistoryLoad();
   }
 
@@ -2462,19 +2482,7 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
     document.getElementById('sampleBtn')?.click();
   });
 
-  // Override showApp to add landing transition
-  const _origShowApp = showApp;
-  showApp = function(user) {
-    currentUser = user;
-    authScreen.style.display = 'none';
-    landingPage.style.display = 'none';
-    appScreen.classList.add('active');
-    userEmailLabel.textContent = (user.email === GUEST_EMAIL) ? 'Guest' : user.email;
-    const avatar = document.getElementById('userAvatar');
-    if (avatar) avatar.textContent = (user.email === GUEST_EMAIL ? 'G' : user.email.charAt(0).toUpperCase());
-    if (typeof admetHistoryLoad === 'function') admetHistoryLoad();
-    updateDashboardStats();
-  };
+  // showApp is already defined in the auth script above with landing page handling
 
   // Dashboard stats
   function updateDashboardStats() {
