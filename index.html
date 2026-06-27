@@ -2125,7 +2125,7 @@ setTimeout(landingScrollReveal, 100);
         </div>
       </div>
 
-      <p style="color:var(--text-dim);font-size:14px;line-height:1.6;margin-bottom:20px;max-width:720px;">Paste up to 50 PubChem Compound IDs or compound names — one per line, or comma-separated for simple names. Chemical names containing commas are automatically detected.</p>
+      <p style="color:var(--text-dim);font-size:14px;line-height:1.6;margin-bottom:20px;max-width:720px;">Paste up to 50 PubChem Compound IDs or compound names — one per line. GC-MS inverted names (e.g. "Pentane, 2,3,3-trimethyl-") are automatically converted to standard form before searching.</p>
 
       <div class="glass-card" id="pubchemConsole">
         <div class="card-header">
@@ -2985,20 +2985,105 @@ setTimeout(landingScrollReveal, 100);
   }
   function hideState() { stateBox.classList.remove('active'); }
 
-  async function resolveEntryToCid(entry) {
-    if (/^\d+$/.test(entry)) {
-      return { cid: entry, inputLabel: entry };
+  /**
+   * Convert GC-MS inverted IUPAC names to standard form PubChem recognises.
+   * Returns an array of candidate name variants to try (in order).
+   *
+   * GC-MS names are typically "Base, substituent-" where the substituent ends
+   * with a dash and should be prepended to the base name.
+   *
+   * Examples:
+   *   "Pentane, 2,3,3-trimethyl-"         => ["2,3,3-trimethylpentane", ...]
+   *   "Cyclohexane, ethenyl-"              => ["ethenylcyclohexane", ...]
+   *   "Furan-2-carboxaldehyde, 5-(1-piperidyl)-" => ["5-(1-piperidyl)furan-2-carboxaldehyde", ...]
+   *   "Eicosanoic acid, methyl ester"      => [] (no trailing dash, not a GC-MS inverted name)
+   */
+  function getGcmsVariants(name) {
+    if (/^\d+$/.test(name)) return [];
+    const trimmed = name.trim();
+
+    // Find the first comma that separates the base from the substituent part
+    const commaIdx = trimmed.indexOf(',');
+    if (commaIdx === -1) return [];
+
+    const base = trimmed.slice(0, commaIdx).trim();
+    const rest = trimmed.slice(commaIdx + 1).trim();
+
+    const variants = [];
+
+    // Pattern 1: substituent ends with a dash → GC-MS inverted name
+    // "Pentane, 2,3,3-trimethyl-"  →  "2,3,3-trimethylpentane"
+    if (rest.endsWith('-')) {
+      const modifier = rest.slice(0, -1).trim();
+      // Join modifier directly with base (lowercased first char)
+      const joined = modifier + base.charAt(0).toLowerCase() + base.slice(1);
+      variants.push(joined);
+      // Also try with a space in case PubChem needs it
+      variants.push(modifier + ' ' + base.toLowerCase());
     }
+
+    // Pattern 2: "Base, N-descriptor" where descriptor has no trailing dash
+    // e.g. "Eicosanoic acid, methyl ester" — try "methyl ester of eicosanoic acid" style
+    // PubChem usually finds these by the original name, so just try reversed
+    if (!rest.endsWith('-') && rest.length > 0) {
+      variants.push(rest + ' ' + base.toLowerCase());
+    }
+
+    return variants;
+  }
+
+  async function fetchCidByName(nameVariant) {
     try {
-      const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(entry)}/cids/JSON`;
+      const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(nameVariant)}/cids/JSON`;
       const res = await fetch(url);
-      if (!res.ok) return { cid: null, inputLabel: entry };
+      if (!res.ok) return null;
       const data = await res.json();
-      const cid = data?.IdentifierList?.CID?.[0];
-      return cid ? { cid: String(cid), inputLabel: entry } : { cid: null, inputLabel: entry };
-    } catch (e) {
-      return { cid: null, inputLabel: entry };
+      return data?.IdentifierList?.CID?.[0] ? String(data.IdentifierList.CID[0]) : null;
+    } catch { return null; }
+  }
+
+  async function resolveEntryToCid(entry) {
+    if (/^\d+$/.test(entry)) return { cid: entry, inputLabel: entry };
+
+    // Strategy 1: original name as typed (PubChem often recognises inverted names directly)
+    let cid = await fetchCidByName(entry);
+    if (cid) return { cid, inputLabel: entry };
+
+    // Strategy 2: GC-MS name conversion variants
+    const gcmsVariants = getGcmsVariants(entry);
+    for (const variant of gcmsVariants) {
+      if (variant && variant !== entry) {
+        cid = await fetchCidByName(variant);
+        if (cid) return { cid, inputLabel: entry };
+      }
     }
+
+    // Strategy 3: strip stereochemistry suffix  e.g. ", (1.alpha.,2.alpha.,3.beta.)-"
+    const noStereo = entry.replace(/,\s*\([^)]*\)\s*[-]?\s*$/, '').trim();
+    if (noStereo !== entry && noStereo.length > 0) {
+      cid = await fetchCidByName(noStereo);
+      if (cid) return { cid, inputLabel: entry };
+      // Also try GC-MS conversion on the stereochemistry-stripped name
+      const noStereoVariants = getGcmsVariants(noStereo);
+      for (const variant of noStereoVariants) {
+        if (variant && variant !== noStereo) {
+          cid = await fetchCidByName(variant);
+          if (cid) return { cid, inputLabel: entry };
+        }
+      }
+    }
+
+    // Strategy 4: try the part before the first comma alone (base compound)
+    const firstComma = entry.indexOf(',');
+    if (firstComma > 0) {
+      const baseOnly = entry.slice(0, firstComma).trim();
+      if (baseOnly && baseOnly !== entry) {
+        cid = await fetchCidByName(baseOnly);
+        if (cid) return { cid, inputLabel: entry };
+      }
+    }
+
+    return { cid: null, inputLabel: entry };
   }
 
   async function runBatch() {
