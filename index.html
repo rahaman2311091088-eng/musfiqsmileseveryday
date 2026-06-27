@@ -2132,7 +2132,7 @@ setTimeout(landingScrollReveal, 100);
           <div class="card-label">CIDs or compound names (max 50)</div>
           <div class="count-badge" id="countBadge"><b>0</b> / 50</div>
         </div>
-        <textarea id="cidInput" placeholder="One entry per line (recommended for chemical names):&#10;2244&#10;aspirin&#10;12-Oxododecanoic acid, ethyl ester&#10;&#10;Simple CIDs/names can also be comma-separated:&#10;2244, caffeine, 5793"></textarea>
+        <textarea id="cidInput" placeholder="One entry per line — CID or compound name:&#10;2244&#10;aspirin&#10;Pentane, 2,3,3-trimethyl-&#10;Eicosanoic acid, methyl ester"></textarea>
         <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
           <button id="fetchBtn" class="btn-accent">Fetch all</button>
           <button id="clearBtn" class="btn-ghost">Clear</button>
@@ -2949,42 +2949,10 @@ setTimeout(landingScrollReveal, 100);
   downloadSdfBtn.addEventListener('click', downloadBulkSdf);
 
   function parseEntries(raw) {
-    // Split by newlines first — each line may be one entry or a comma-separated list of simple CIDs/names.
-    const lines = raw.split(/\n/).map(s => s.trim()).filter(Boolean);
-    const entries = [];
-
-    for (const line of lines) {
-      if (!line.includes(',')) {
-        // No comma at all — treat as single entry
-        entries.push(line);
-        continue;
-      }
-
-      // Line contains commas. Check if it looks like a chemical name that naturally
-      // contains commas (e.g. "12-Oxododecanoic acid, ethyl ester").
-      // Heuristic: if any comma-separated token (after trimming) contains a space AND
-      // starts with a lowercase letter or looks like a chemical suffix (ester, acid, etc.)
-      // it's almost certainly a compound name with an embedded comma — keep it whole.
-      const parts = line.split(',').map(s => s.trim()).filter(Boolean);
-      const looksLikeSplittable = parts.every(p => {
-        // A pure CID (all digits) is always safe to split
-        if (/^\d+$/.test(p)) return true;
-        // A simple single-word name with no spaces (e.g. "aspirin", "caffeine") is safe
-        if (!/\s/.test(p)) return true;
-        // A short phrase that starts with a capital and has no chemical suffixes is likely
-        // a distinct compound name entered on one line
-        return false;
-      });
-
-      if (looksLikeSplittable) {
-        entries.push(...parts);
-      } else {
-        // Treat the whole line as one compound name
-        entries.push(line);
-      }
-    }
-
-    return entries;
+    // One entry per line — each line is treated as a single compound name or CID.
+    // Commas within a line are preserved (they are often part of chemical names,
+    // e.g. "Pentane, 2,3,3-trimethyl-" or "Eicosanoic acid, methyl ester").
+    return raw.split(/\n/).map(s => s.trim()).filter(Boolean);
   }
 
   function updateCount() {
