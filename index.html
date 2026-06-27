@@ -1546,7 +1546,7 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
 }
 .docking-drop-zone:hover { border-color: var(--accent-dim); background: rgba(127,231,196,0.03); }
 .docking-drop-zone.drag-over { border-color: var(--accent); background: rgba(127,231,196,0.06); }
-.docking-drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.docking-drop-zone > *:not(input) { position: relative; z-index: 1; pointer-events: none; }
 
 .docking-file-item {
   display: flex; align-items: center; gap: 10px;
@@ -2285,11 +2285,12 @@ setTimeout(landingScrollReveal, 100);
           <div class="drop-zone-icon">
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           </div>
-          <div style="font-size:14px;color:var(--text-dim);margin-bottom:4px;">
-            Drag & drop <strong>.xlsx</strong> files here, or click to browse
+          <div style="font-size:14px;color:var(--text-dim);margin-bottom:8px;">
+            Drag & drop <strong>.xlsx</strong> files here, or
           </div>
-          <div style="font-size:12px;color:var(--text-muted);">Each file = 1 protein · Max 15 files</div>
-          <input type="file" id="dockingFileInput" accept=".xlsx,.xls" multiple>
+          <button type="button" id="dockingBrowseBtn" style="padding:8px 20px;background:var(--accent);color:#000;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:6px;">Browse Files</button>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Each file = 1 protein · Max 15 files</div>
+          <input type="file" id="dockingFileInput" multiple style="display:none;">
         </div>
 
         <!-- File List -->
@@ -4105,24 +4106,42 @@ setTimeout(landingScrollReveal, 100);
 
   // Drop zone events
   if (dropZone) {
-    dropZone.addEventListener('click', () => fileInput?.click());
+    // The <input> is a full-size absolute overlay (z-index:2) so it naturally receives all clicks.
+    // No manual click() forwarding needed — that caused double-dialog issues.
 
     dropZone.addEventListener('dragover', (e) => {
       e.preventDefault();
       dropZone.classList.add('drag-over');
     });
-    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('dragleave', (e) => {
+      // Only remove class if leaving the drop zone entirely (not just moving between children)
+      if (!dropZone.contains(e.relatedTarget)) dropZone.classList.remove('drag-over');
+    });
     dropZone.addEventListener('drop', (e) => {
       e.preventDefault();
       dropZone.classList.remove('drag-over');
       handleFiles(e.dataTransfer.files);
     });
+    // Also handle drag events on the input overlay itself
+    if (fileInput) {
+      fileInput.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+      fileInput.addEventListener('dragleave', (e) => { if (!dropZone.contains(e.relatedTarget)) dropZone.classList.remove('drag-over'); });
+      fileInput.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('drag-over'); handleFiles(e.dataTransfer.files); });
+    }
+  } // end if (dropZone)
+
+  // Browse button triggers the hidden file input
+  const browseBtn = document.getElementById('dockingBrowseBtn');
+  if (browseBtn && fileInput) {
+    browseBtn.addEventListener('click', () => fileInput.click());
   }
 
   if (fileInput) {
-    fileInput.addEventListener('change', () => {
-      if (fileInput.files.length > 0) handleFiles(fileInput.files);
-      fileInput.value = '';
+    fileInput.addEventListener('change', async () => {
+      if (fileInput.files.length > 0) {
+        await handleFiles(fileInput.files);
+      }
+      fileInput.value = '';  // reset AFTER async handleFiles completes
     });
   }
 
@@ -4147,7 +4166,7 @@ setTimeout(landingScrollReveal, 100);
         const f = dockingFiles[i];
         progressText.textContent = 'Processing ' + f.name + '…';
         progressCount.textContent = (i + 1) + ' / ' + totalFiles;
-        progressFill.style.width = ((i + 1) / totalFiles * 50) + '%;
+        progressFill.style.width = ((i + 1) / totalFiles * 50) + '%';
 
         const headers = f.sheetData.length > 0 ? Object.keys(f.sheetData[0]) : [];
         const ligandCol = findCol(headers, LIGAND_NAMES);
