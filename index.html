@@ -5721,7 +5721,19 @@ setTimeout(landingScrollReveal, 100);
     if (typeof showToast === 'function') showToast('Batch Complete', `Successfully added ${addedCount} compounds to ADMET dataset.`, 'success');
   });
 
-  // ── Word Document (.docx) Generator ──
+  // ── Word Document (.docx) Generator (Authentic DDU Table A + Table B Format) ──
+  function admetVal(c, id) {
+    if (!c) return '';
+    let v = c[id];
+    if (v === undefined || v === null || v === '') {
+      const shortId = id.replace(/^admet_/, '');
+      v = c[shortId];
+      if (shortId === 'lipinski_viol' && v === undefined) v = c['viol'];
+      if (shortId === 'synAccess' && v === undefined) v = c['sa'];
+    }
+    return (v === undefined || v === null || v === '') ? '' : String(v);
+  }
+
   async function generateWordReport() {
     if (admetCompounds.length === 0) {
       if (typeof showToast === 'function') showToast('Empty dataset', 'Please add at least one compound to generate a report.', 'info');
@@ -5730,93 +5742,264 @@ setTimeout(landingScrollReveal, 100);
 
     const docxLib = window.docx || window;
     if (!docxLib || !docxLib.Document) {
-      alert('The docx library is initializing. Please try again in 2 seconds.');
+      alert('The docx library failed to load. Please refresh the page and try again.');
       return;
     }
 
-    const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, AlignmentType, BorderStyle, WidthType, ShadingType } = docxLib;
+    const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell } = docxLib;
     const statusEl = document.getElementById('admetDocxStatus');
-    if (statusEl) statusEl.textContent = 'Building .docx document…';
+    if (statusEl) statusEl.textContent = 'Building document…';
 
-    const cellBorder = { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" };
-    const borders = { top: cellBorder, bottom: cellBorder, left: cellBorder, right: cellBorder };
-    const headerShading = { fill: "0F1E2E", type: ShadingType.CLEAR };
-    const zebraShading = { fill: "F4F8FA", type: ShadingType.CLEAR };
+    const ALIGN_CENTER = 'center';
+    const ALIGN_LEFT = 'left';
+    const BORDER_SINGLE = 'single';
+    const WIDTH_DXA = 'dxa';
+    const SHADING_CLEAR = 'clear';
+    const VALIGN_CENTER = 'center';
+    const HEADING_2 = 'Heading2';
 
-    // Header row
-    const tableHeader = new TableRow({
-      tableHeader: true,
-      children: [
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "#", bold: true, color: "7FE7C4" })] })], shading: headerShading, borders }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "CID", bold: true, color: "FFFFFF" })] })], shading: headerShading, borders }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Compound", bold: true, color: "FFFFFF" })] })], shading: headerShading, borders }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "MW (g/mol)", bold: true, color: "FFFFFF" })] })], shading: headerShading, borders }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "LogP", bold: true, color: "FFFFFF" })] })], shading: headerShading, borders }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "GI Abs.", bold: true, color: "FFFFFF" })] })], shading: headerShading, borders }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "BBB", bold: true, color: "FFFFFF" })] })], shading: headerShading, borders }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Lipinski", bold: true, color: "FFFFFF" })] })], shading: headerShading, borders }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "LD50 (mg/kg)", bold: true, color: "FFFFFF" })] })], shading: headerShading, borders }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "GHS Class", bold: true, color: "FFFFFF" })] })], shading: headerShading, borders }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Hepatotoxicity", bold: true, color: "FFFFFF" })] })], shading: headerShading, borders })
-      ]
-    });
+    const border = { style: BORDER_SINGLE, size: 4, color: "B7C4CC" };
+    const borders = { top: border, bottom: border, left: border, right: border };
+    const headerShade = { fill: "1F3245", type: SHADING_CLEAR };
+    const labelShade = { fill: "EAF2EF", type: SHADING_CLEAR };
 
-    const dataRows = admetCompounds.map((c, idx) => {
-      const shading = idx % 2 === 1 ? zebraShading : undefined;
-      return new TableRow({
+    function cellText(text, opts = {}) {
+      return new Paragraph({
+        alignment: opts.align || ALIGN_CENTER,
+        children: [new TextRun({ text: text || '', bold: !!opts.bold, color: opts.color || "1A1A1A", size: opts.size || 18 })]
+      });
+    }
+
+    function headCell(text, width) {
+      return new TableCell({
+        borders, width: { size: width, type: WIDTH_DXA }, shading: headerShade,
+        verticalAlign: VALIGN_CENTER,
+        margins: { top: 50, bottom: 50, left: 50, right: 50 },
+        children: [cellText(text, { bold: true, color: "FFFFFF", size: 16 })]
+      });
+    }
+
+    function labelCell(text, width) {
+      return new TableCell({
+        borders, width: { size: width, type: WIDTH_DXA }, shading: labelShade,
+        verticalAlign: VALIGN_CENTER,
+        margins: { top: 40, bottom: 40, left: 60, right: 40 },
+        children: [cellText(text, { bold: true, align: ALIGN_LEFT, size: 16 })]
+      });
+    }
+
+    function dataCell(text, width) {
+      return new TableCell({
+        borders, width: { size: width, type: WIDTH_DXA },
+        verticalAlign: VALIGN_CENTER,
+        margins: { top: 40, bottom: 40, left: 40, right: 40 },
+        children: [cellText(text || '—', { size: 16, color: text ? "1A1A1A" : "9AA5AC" })]
+      });
+    }
+
+    // Table A row groups: [groupLabel, [[fieldLabel, fieldId], ...]]
+    const tableARows = [
+      ['Physicochemical properties', [
+        ['M. W. (g/mol)', 'admet_mw'],
+        ['Heavy atoms', 'admet_heavyAtoms'],
+        ['Arom. heavy atoms', 'admet_aromAtoms'],
+        ['Rotatable bonds', 'admet_rotBonds'],
+        ['H-bond acceptors', 'admet_hAcceptors'],
+        ['H-bond donors', 'admet_hDonors'],
+        ['Molar Refractivity', 'admet_molarRef'],
+      ]],
+      ['Lipophilicity', [['Log P o/w', 'admet_logp']]],
+      ['Water Solubility', [['Log S (ESOL)', 'admet_logs']]],
+      ['Pharmacokinetics', [
+        ['GI absorption', 'admet_gi'],
+        ['BBB permeant', 'admet_bbb'],
+      ]],
+      ['Drug-likeness', [
+        ['Lipinski', 'admet_lipinski'],
+        ['Lipinski violations', 'admet_lipinski_viol'],
+        ['Ghose', 'admet_ghose'],
+        ['Veber', 'admet_veber'],
+        ['Egan', 'admet_egan'],
+        ['Muegge', 'admet_muegge'],
+        ['Bioavailability Score', 'admet_bioavail'],
+      ]],
+      ['Med. Chemistry', [['Synthetic accessibility', 'admet_synAccess']]],
+    ];
+
+    const tableBCols = [
+      ['LD50', 'admet_ld50'],
+      ['Hepatotoxicity', 'admet_hepato'],
+      ['Carcinogenicity', 'admet_carcino'],
+      ['Immunotoxicity', 'admet_immuno'],
+      ['Mutagenicity', 'admet_mutagen'],
+      ['Cytotoxicity', 'admet_cyto'],
+      ['Acute Oral Toxicity', 'admet_ghs'],
+    ];
+
+    const PAGE_SIZE = 15;
+    const pages = [];
+    for (let i = 0; i < admetCompounds.length; i += PAGE_SIZE) {
+      pages.push(admetCompounds.slice(i, i + PAGE_SIZE));
+    }
+
+    // Landscape US Letter
+    const CONTENT_WIDTH = 14400;
+    const LABEL_COL_W = 1400;
+    const ATTR_COL_W = 1600;
+
+    function buildTableAPage(pageCompounds, startIndex) {
+      const n = pageCompounds.length;
+      const remaining = CONTENT_WIDTH - LABEL_COL_W - ATTR_COL_W;
+      const dataColW = Math.floor(remaining / n);
+      const totalW = LABEL_COL_W + ATTR_COL_W + dataColW * n;
+      const columnWidths = [LABEL_COL_W, ATTR_COL_W, ...pageCompounds.map(() => dataColW)];
+
+      const headerRow = new TableRow({
+        tableHeader: true,
         children: [
-          new TableCell({ children: [new Paragraph(String(idx + 1))], shading, borders }),
-          new TableCell({ children: [new Paragraph(c.cid || "—")], shading, borders }),
-          new TableCell({ children: [new Paragraph(c.name || "Compound")], shading, borders }),
-          new TableCell({ children: [new Paragraph(String(c.mw || "—"))], shading, borders }),
-          new TableCell({ children: [new Paragraph(String(c.logp || "—"))], shading, borders }),
-          new TableCell({ children: [new Paragraph(String(c.gi || "—"))], shading, borders }),
-          new TableCell({ children: [new Paragraph(String(c.bbb || "—"))], shading, borders }),
-          new TableCell({ children: [new Paragraph(`${c.lipinski || '—'} (${c.viol || 0})`)], shading, borders }),
-          new TableCell({ children: [new Paragraph(String(c.ld50 || "—"))], shading, borders }),
-          new TableCell({ children: [new Paragraph(`Class ${c.ghs || '—'}`)], shading, borders }),
-          new TableCell({ children: [new Paragraph(String(c.hepato || "—"))], shading, borders })
+          headCell('Properties', LABEL_COL_W),
+          headCell('Attributes', ATTR_COL_W),
+          ...pageCompounds.map((c) => headCell(c.compound || c.cid || c.name || 'CID', dataColW)),
         ]
       });
+
+      const bodyRows = [];
+      tableARows.forEach(([groupLabel, fields]) => {
+        fields.forEach(([fieldLabel, fieldId], fi) => {
+          bodyRows.push(new TableRow({
+            children: [
+              labelCell(fi === 0 ? groupLabel : '', LABEL_COL_W),
+              labelCell(fieldLabel, ATTR_COL_W),
+              ...pageCompounds.map(c => dataCell(admetVal(c, fieldId), dataColW)),
+            ]
+          }));
+        });
+      });
+
+      return new Table({
+        width: { size: totalW, type: WIDTH_DXA },
+        columnWidths,
+        rows: [headerRow, ...bodyRows],
+      });
+    }
+
+    function buildTableBPage(pageCompounds, startIndex) {
+      const nameColW = 2600;
+      const dataColW = Math.floor((CONTENT_WIDTH - nameColW) / tableBCols.length);
+      const totalW = nameColW + dataColW * tableBCols.length;
+      const columnWidths = [nameColW, ...tableBCols.map(() => dataColW)];
+
+      const headerRow = new TableRow({
+        tableHeader: true,
+        children: [
+          headCell('CID / Name', nameColW),
+          ...tableBCols.map(([label]) => headCell(label, dataColW)),
+        ]
+      });
+
+      const bodyRows = pageCompounds.map((c, i) => new TableRow({
+        children: [
+          labelCell(c.compound || c.cid || c.name || 'CID', nameColW),
+          ...tableBCols.map(([, fieldId]) => dataCell(admetVal(c, fieldId), dataColW)),
+        ]
+      }));
+
+      return new Table({
+        width: { size: totalW, type: WIDTH_DXA },
+        columnWidths,
+        rows: [headerRow, ...bodyRows],
+      });
+    }
+
+    const children = [];
+
+    // Title & Subtitle matching the authentic layout
+    children.push(new Paragraph({
+      alignment: ALIGN_CENTER,
+      children: [new TextRun({ text: "ADMET Properties of Selected Compounds", bold: true, size: 32, color: "0F1E2E" })],
+      spacing: { after: 120 }
+    }));
+    children.push(new Paragraph({
+      alignment: ALIGN_CENTER,
+      children: [new TextRun({ text: `${admetCompounds.length} Compounds  |  SwissADME / pkCSM / ProTox-3.0 Analysis`, italics: true, size: 20, color: "5A6B7A" })],
+      spacing: { after: 360 }
+    }));
+
+    // Table A pages
+    pages.forEach((pageCompounds, pIdx) => {
+      const startIndex = pIdx * PAGE_SIZE;
+      const rangeLabel = pageCompounds.length > 1
+        ? `CIDs: ${pageCompounds.map(c => c.compound || c.cid || 'CID').join(', ')}`
+        : `CID: ${pageCompounds[0].compound || pageCompounds[0].cid || 'CID'}`;
+
+      children.push(new Paragraph({
+        heading: HEADING_2,
+        children: [new TextRun({ text: pIdx === 0 ? "Table A: Physicochemical Properties of Selected Ligands" : "Table A (continued): Physicochemical Properties of Selected Ligands", bold: true, size: 24, color: "0F1E2E" })],
+        spacing: { before: pIdx === 0 ? 0 : 480, after: 80 }
+      }));
+      children.push(new Paragraph({
+        children: [new TextRun({ text: rangeLabel, italics: true, size: 19, color: "5A6B7A" })],
+        spacing: { after: 160 }
+      }));
+      children.push(buildTableAPage(pageCompounds, startIndex));
     });
 
-    const table = new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      rows: [tableHeader, ...dataRows]
+    // Table B pages
+    pages.forEach((pageCompounds, pIdx) => {
+      const startIndex = pIdx * PAGE_SIZE;
+      const rangeLabel = pageCompounds.length > 1
+        ? `CIDs: ${pageCompounds.map(c => c.compound || c.cid || 'CID').join(', ')}`
+        : `CID: ${pageCompounds[0].compound || pageCompounds[0].cid || 'CID'}`;
+
+      children.push(new Paragraph({
+        heading: HEADING_2,
+        children: [new TextRun({ text: pIdx === 0 ? "Table B: Toxicity Profile of Selected Compounds" : "Table B (continued): Toxicity Profile of Selected Compounds", bold: true, size: 24, color: "0F1E2E" })],
+        spacing: { before: 480, after: 80 }
+      }));
+      children.push(new Paragraph({
+        children: [new TextRun({ text: rangeLabel, italics: true, size: 19, color: "5A6B7A" })],
+        spacing: { after: 160 }
+      }));
+      children.push(buildTableBPage(pageCompounds, startIndex));
     });
+
+    // Footnotes & Abbreviations
+    children.push(new Paragraph({
+      children: [new TextRun({
+        text: "Abbreviations: M.W. = Molecular Weight; Arom. = Aromatic; H-bond = Hydrogen bond; GI = Gastrointestinal; BBB = Blood-Brain Barrier; Log P = Partition coefficient (lipophilicity); Log S = Aqueous solubility; LD50 = Lethal Dose 50%; GHS = Globally Harmonized System.",
+        italics: true, size: 15, color: "5A6B7A"
+      })],
+      spacing: { before: 480, after: 60 }
+    }));
+    children.push(new Paragraph({
+      children: [new TextRun({
+        text: "Sources: SwissADME (swissadme.ch) for physicochemical/ADME properties; pkCSM or ProTox-3.0 for toxicity prediction. Automated in silico computation.",
+        italics: true, size: 15, color: "5A6B7A"
+      })]
+    }));
+    children.push(new Paragraph({
+      alignment: ALIGN_CENTER,
+      children: [new TextRun({ text: "Generated via Drug Design Universe · Md Musfiqur Rahaman · Department of Pharmacy · Daffodil International University", size: 15, color: "8FA3B0" })],
+      spacing: { before: 240 }
+    }));
 
     const doc = new Document({
-      sections: [{
-        children: [
-          new Paragraph({
-            text: "DRUG DESIGN UNIVERSE (DDU)",
-            heading: HeadingLevel.TITLE,
-            alignment: AlignmentType.CENTER
-          }),
-          new Paragraph({
-            text: "Automated In Silico ADMET & Toxicological Dossier",
-            alignment: AlignmentType.CENTER
-          }),
-          new Paragraph({
-            text: `Generated on ${new Date().toLocaleDateString()} | Total Compounds Analyzed: ${admetCompounds.length}`,
-            alignment: AlignmentType.CENTER
-          }),
-          new Paragraph({ text: "" }),
-          new Paragraph({
-            text: "1. Dataset ADMET Profiling Summary Matrix",
-            heading: HeadingLevel.HEADING_1
-          }),
-          table,
-          new Paragraph({ text: "" }),
-          new Paragraph({
-            text: "2. Computational Methodology & Models",
-            heading: HeadingLevel.HEADING_1
-          }),
-          new Paragraph("• SwissADME Pharmacokinetics: Wildman-Crippen lipophilicity (WLOGP) and Topological Polar Surface Area (TPSA) calculated using the calibrated BOILED-Egg model (Daina & Zoete, ChemMedChem 2016)."),
-          new Paragraph("• Water Solubility (ESOL): Delaney topological linear model for Log S quantitative aqueous solubility estimation."),
-          new Paragraph("• Drug-Likeness Filters: Lipinski Rule of 5 (MW ≤ 500, LogP ≤ 5, HBD ≤ 5, HBA ≤ 10), Ghose, Veber, Egan, and Muegge criteria."),
-          new Paragraph("• ProTox-II In Silico Toxicity: Rodent oral acute toxicity regression (LD50 in mg/kg) mapped to GHS hazard classes I-VI, and organ/toxicological endpoint classification (Hepatotoxicity, Carcinogenicity, Mutagenicity, Cytotoxicity, Immunotoxicity).")
+      styles: {
+        default: { document: { run: { font: "Calibri", size: 20 } } },
+        paragraphStyles: [
+          { id: "Heading2", name: "Heading 2", basedOn: "Normal", next: "Normal", quickFormat: true,
+            run: { size: 24, bold: true, font: "Calibri" },
+            paragraph: { spacing: { before: 240, after: 120 }, outlineLevel: 1 } },
         ]
+      },
+      sections: [{
+        properties: {
+          page: {
+            size: { width: 12240, height: 15840, orientation: "landscape" },
+            margin: { top: 720, right: 720, bottom: 720, left: 720 }
+          }
+        },
+        children
       }]
     });
 
@@ -5825,7 +6008,8 @@ setTimeout(landingScrollReveal, 100);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `DDU-ADMET-Report-${admetCompounds.length}-compounds-${new Date().toISOString().slice(0,10)}.docx`;
+      const stamp = new Date().toISOString().slice(0, 10);
+      a.download = `ADMET-Profile-${admetCompounds.length}-compounds-${stamp}.docx`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
