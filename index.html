@@ -1736,7 +1736,18 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
 <!-- SPLIT HERO -->
 <div class="landing-hero">
   <div class="hero-left">
-    <div class="landing-badge reveal"><span class="dot"></span> <span id="landingHeroUsage">Used 18,740+ times by 2,480+ researchers worldwide</span></div>
+        <div class="landing-badge reveal"><span class="dot"></span> v2.2 · Active Research Platform</div>
+    <div class="reveal reveal-d1" style="display:inline-flex;align-items:center;gap:16px;background:rgba(13,21,38,0.9);border:1px solid rgba(127,231,196,0.35);border-radius:40px;padding:10px 24px;margin-bottom:20px;box-shadow:0 0 30px rgba(127,231,196,0.15);">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:18px;">👥</span>
+        <span style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--text);"><span id="landingHeroPeople" style="color:var(--accent);font-size:16px;">2,480+</span> Researchers</span>
+      </div>
+      <div style="width:1px;height:20px;background:rgba(127,231,196,0.3);"></div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:18px;">⚡</span>
+        <span style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--text);"><span id="landingHeroRuns" style="color:var(--accent);font-size:16px;">18,740+</span> Times Used</span>
+      </div>
+    </div>
     <h1 class="landing-title reveal reveal-d1">Accelerate Your<br><span class="gradient">Drug Discovery</span></h1>
     <p class="landing-subtitle reveal reveal-d2">Batch PubChem lookup, ADMET profiling, and automated report generation — the all-in-one platform for pharmaceutical researchers.</p>
     <div class="landing-actions reveal reveal-d3">
@@ -2317,8 +2328,12 @@ setTimeout(landingScrollReveal, 100);
             Automated physicochemical, SwissADME pharmacokinetics, BOILED-Egg, drug-likeness filters, and ProTox-II toxicity profiling with Word report (.docx) export.
           </p>
         </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          <button class="btn-accent" id="admetGenerateDocxTopBtn" style="display:inline-flex;align-items:center;gap:8px;">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn-ghost" id="admetViewDashBtn" style="display:inline-flex;align-items:center;gap:8px;border-color:var(--accent-dim);color:var(--accent);">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+              View Summary in Dashboard →
+            </button>
+            <button class="btn-accent" id="admetGenerateDocxTopBtn" style="display:inline-flex;align-items:center;gap:8px;">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Generate Word Report (.docx)
           </button>
@@ -2983,6 +2998,11 @@ setTimeout(landingScrollReveal, 100);
     document.querySelectorAll('.main-panel').forEach(p => {
       p.classList.toggle('active', p.id === panelId);
     });
+    if (panelId === 'dashboardPanel') {
+      if (typeof updateDashboardStats === 'function') updateDashboardStats();
+      if (typeof updateDashboardAdmetSummary === 'function') updateDashboardAdmetSummary();
+      if (typeof initGlobalUsageCounters === 'function') initGlobalUsageCounters();
+    }
   }
 
   document.querySelectorAll('.sidebar-item[data-panel], .mobile-nav-item[data-panel]').forEach(el => {
@@ -4979,7 +4999,13 @@ setTimeout(landingScrollReveal, 100);
     const totalUsers = (GLOBAL_BASE_USERS + localExtraUsers).toLocaleString() + '+';
     const totalRuns = (GLOBAL_BASE_RUNS + localExtraRuns).toLocaleString() + '+';
 
-    // Update landing page
+    // Update landing page hero & banner
+    const heroPeople = document.getElementById('landingHeroPeople');
+    if (heroPeople) heroPeople.textContent = totalUsers;
+
+    const heroRuns = document.getElementById('landingHeroRuns');
+    if (heroRuns) heroRuns.textContent = totalRuns;
+
     const heroUsage = document.getElementById('landingHeroUsage');
     if (heroUsage) heroUsage.textContent = `Used ${totalRuns} times by ${totalUsers} researchers worldwide`;
 
@@ -5352,11 +5378,62 @@ setTimeout(landingScrollReveal, 100);
 
   // State
   let currentAdmetData = null;
+  // Default benchmark compounds so dashboard summary is immediately populated on first visit
+  const DEFAULT_BENCHMARK_COMPOUNDS = [
+    {
+      compound: '2244', cid: '2244', name: 'Aspirin', smiles: 'CC(=O)Oc1ccccc1C(=O)O', formula: 'C9H8O4',
+      admet_mw: 180.16, mw: 180.16, admet_heavyAtoms: 13, admet_aromAtoms: 6, admet_rotBonds: 2, admet_hAcceptors: 3, admet_hDonors: 1, admet_molarRef: 44.69,
+      admet_logp: 1.31, logp: 1.31, admet_logs: -2.17, logs: -2.17, admet_gi: 'High', gi: 'High', admet_bbb: 'Yes', bbb: 'Yes',
+      admet_lipinski: 'Yes', lipinski: 'Yes', admet_lipinski_viol: 0, viol: 0, admet_ghose: 'Yes', admet_veber: 'Yes', admet_egan: 'Yes', admet_muegge: 'Yes',
+      admet_bioavail: '0.55', bioavail: '0.55', admet_synAccess: 1.85, sa: 1.85, admet_ld50: 1060, ld50: 1060, admet_ghs: '4', ghs: '4',
+      admet_hepato: 'Inactive', hepato: 'Inactive', admet_carcino: 'Inactive', carcino: 'Inactive', admet_immuno: 'Active', immuno: 'Active', admet_mutagen: 'Inactive', mutagen: 'Inactive', admet_cyto: 'Inactive', cyto: 'Inactive'
+    },
+    {
+      compound: '1983', cid: '1983', name: 'Paracetamol', smiles: 'CC(=O)Nc1ccc(O)cc1', formula: 'C8H9NO2',
+      admet_mw: 151.16, mw: 151.16, admet_heavyAtoms: 11, admet_aromAtoms: 6, admet_rotBonds: 1, admet_hAcceptors: 2, admet_hDonors: 2, admet_molarRef: 41.52,
+      admet_logp: 0.91, logp: 0.91, admet_logs: -1.74, logs: -1.74, admet_gi: 'High', gi: 'High', admet_bbb: 'Yes', bbb: 'Yes',
+      admet_lipinski: 'Yes', lipinski: 'Yes', admet_lipinski_viol: 0, viol: 0, admet_ghose: 'Yes', admet_veber: 'Yes', admet_egan: 'Yes', admet_muegge: 'Yes',
+      admet_bioavail: '0.55', bioavail: '0.55', admet_synAccess: 1.35, sa: 1.35, admet_ld50: 2404, ld50: 2404, admet_ghs: '5', ghs: '5',
+      admet_hepato: 'Active', hepato: 'Active', admet_carcino: 'Inactive', carcino: 'Inactive', admet_immuno: 'Inactive', immuno: 'Inactive', admet_mutagen: 'Inactive', mutagen: 'Inactive', admet_cyto: 'Inactive', cyto: 'Inactive'
+    },
+    {
+      compound: '2519', cid: '2519', name: 'Caffeine', smiles: 'Cn1cnc2c1c(=O)n(c(=O)n2C)C', formula: 'C8H10N4O2',
+      admet_mw: 194.19, mw: 194.19, admet_heavyAtoms: 14, admet_aromAtoms: 9, admet_rotBonds: 0, admet_hAcceptors: 4, admet_hDonors: 0, admet_molarRef: 49.38,
+      admet_logp: -0.07, logp: -0.07, admet_logs: -1.25, logs: -1.25, admet_gi: 'High', gi: 'High', admet_bbb: 'Yes', bbb: 'Yes',
+      admet_lipinski: 'Yes', lipinski: 'Yes', admet_lipinski_viol: 0, viol: 0, admet_ghose: 'Yes', admet_veber: 'Yes', admet_egan: 'Yes', admet_muegge: 'Yes',
+      admet_bioavail: '0.55', bioavail: '0.55', admet_synAccess: 2.20, sa: 2.20, admet_ld50: 192, ld50: 192, admet_ghs: '3', ghs: '3',
+      admet_hepato: 'Inactive', hepato: 'Inactive', admet_carcino: 'Inactive', carcino: 'Inactive', admet_immuno: 'Inactive', immuno: 'Inactive', admet_mutagen: 'Active', mutagen: 'Active', admet_cyto: 'Inactive', cyto: 'Inactive'
+    },
+    {
+      compound: '3672', cid: '3672', name: 'Ibuprofen', smiles: 'CC(C)Cc1ccc(cc1)C(C)C(=O)O', formula: 'C13H18O2',
+      admet_mw: 206.28, mw: 206.28, admet_heavyAtoms: 15, admet_aromAtoms: 6, admet_rotBonds: 4, admet_hAcceptors: 2, admet_hDonors: 1, admet_molarRef: 60.73,
+      admet_logp: 3.07, logp: 3.07, admet_logs: -3.42, logs: -3.42, admet_gi: 'High', gi: 'High', admet_bbb: 'Yes', bbb: 'Yes',
+      admet_lipinski: 'Yes', lipinski: 'Yes', admet_lipinski_viol: 0, viol: 0, admet_ghose: 'Yes', admet_veber: 'Yes', admet_egan: 'Yes', admet_muegge: 'Yes',
+      admet_bioavail: '0.55', bioavail: '0.55', admet_synAccess: 2.10, sa: 2.10, admet_ld50: 636, ld50: 636, admet_ghs: '4', ghs: '4',
+      admet_hepato: 'Inactive', hepato: 'Inactive', admet_carcino: 'Inactive', carcino: 'Inactive', admet_immuno: 'Inactive', immuno: 'Inactive', admet_mutagen: 'Inactive', mutagen: 'Inactive', admet_cyto: 'Inactive', cyto: 'Inactive'
+    },
+    {
+      compound: '89594', cid: '89594', name: 'Nicotine', smiles: 'CN1CCC[C@H]1c2cccnc2', formula: 'C10H14N2',
+      admet_mw: 162.23, mw: 162.23, admet_heavyAtoms: 12, admet_aromAtoms: 6, admet_rotBonds: 1, admet_hAcceptors: 2, admet_hDonors: 0, admet_molarRef: 51.52,
+      admet_logp: 1.17, logp: 1.17, admet_logs: -1.60, logs: -1.60, admet_gi: 'High', gi: 'High', admet_bbb: 'Yes', bbb: 'Yes',
+      admet_lipinski: 'Yes', lipinski: 'Yes', admet_lipinski_viol: 0, viol: 0, admet_ghose: 'Yes', admet_veber: 'Yes', admet_egan: 'Yes', admet_muegge: 'Yes',
+      admet_bioavail: '0.55', bioavail: '0.55', admet_synAccess: 2.15, sa: 2.15, admet_ld50: 50, ld50: 50, admet_ghs: '2', ghs: '2',
+      admet_hepato: 'Inactive', hepato: 'Inactive', admet_carcino: 'Inactive', carcino: 'Inactive', admet_immuno: 'Inactive', immuno: 'Inactive', admet_mutagen: 'Inactive', mutagen: 'Inactive', admet_cyto: 'Inactive', cyto: 'Inactive'
+    }
+  ];
+
   let admetCompounds = [];
   try {
     const saved = localStorage.getItem('ddu_admet_compounds');
-    if (saved) admetCompounds = JSON.parse(saved);
-  } catch(e) {}
+    if (saved && JSON.parse(saved).length > 0) {
+      admetCompounds = JSON.parse(saved);
+    } else {
+      admetCompounds = [...DEFAULT_BENCHMARK_COMPOUNDS];
+      localStorage.setItem('ddu_admet_compounds', JSON.stringify(admetCompounds));
+    }
+  } catch(e) {
+    admetCompounds = [...DEFAULT_BENCHMARK_COMPOUNDS];
+  }
   let radarChartInstance = null;
 
   // DOM Elements
@@ -5717,6 +5794,16 @@ setTimeout(landingScrollReveal, 100);
       render2d(cleanCid, p.name);
       drawBoiledEgg(p.tpsa, p.wlogp);
       drawRadar(p.mw, p.wlogp, p.rotBonds || 2, p.hAcceptors || 3, p.hDonors || 1, p.sa);
+
+      // Auto-sync preset into dataset & dashboard summary
+      const existingIdx = admetCompounds.findIndex(c => c.cid === cleanCid);
+      const syncObj = { compound: cleanCid, cid: cleanCid, name: p.name, smiles: p.smiles, formula: p.formula, ...p };
+      if (existingIdx !== -1) admetCompounds[existingIdx] = syncObj;
+      else admetCompounds.unshift(syncObj);
+      try { localStorage.setItem('ddu_admet_compounds', JSON.stringify(admetCompounds)); } catch(e) {}
+      renderTable();
+      if (typeof updateDashboardAdmetSummary === 'function') updateDashboardAdmetSummary();
+      if (typeof recordWorkflowRun === 'function') recordWorkflowRun();
       return;
     }
 
@@ -5748,6 +5835,16 @@ setTimeout(landingScrollReveal, 100);
       render2d(cleanCid, name);
       drawBoiledEgg(computed.tpsa, computed.logp);
       drawRadar(computed.mw, computed.logp, computed.rotBonds, computed.hAcceptors, computed.hDonors, computed.sa);
+
+      // Auto-sync into dataset & dashboard summary
+      const existingIdx = admetCompounds.findIndex(c => c.cid === cleanCid);
+      const syncObj = { compound: cleanCid, cid: cleanCid, name, smiles: smi, formula, ...computed };
+      if (existingIdx !== -1) admetCompounds[existingIdx] = syncObj;
+      else admetCompounds.unshift(syncObj);
+      try { localStorage.setItem('ddu_admet_compounds', JSON.stringify(admetCompounds)); } catch(e) {}
+      renderTable();
+      if (typeof updateDashboardAdmetSummary === 'function') updateDashboardAdmetSummary();
+      if (typeof recordWorkflowRun === 'function') recordWorkflowRun();
 
     } catch (err) {
       console.warn('PubChem fetch error:', err);
@@ -6386,6 +6483,9 @@ setTimeout(landingScrollReveal, 100);
     }
   }
 
+    document.getElementById('admetViewDashBtn')?.addEventListener('click', () => {
+    if (typeof setActivePanel === 'function') setActivePanel('dashboardPanel');
+  });
   document.getElementById('admetGenerateDocxBtn')?.addEventListener('click', generateWordReport);
   document.getElementById('admetGenerateDocxTopBtn')?.addEventListener('click', generateWordReport);
 
