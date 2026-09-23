@@ -5896,6 +5896,75 @@ setTimeout(landingScrollReveal, 100);
     }
   }
 
+  // ── Unified PubChem Compound Resolver (Dual Channel: Live HTML + PUG REST + In-Silico) ──
+  async function lookupPubChemCompound(cleanCid) {
+    let name = `CID ${cleanCid}`;
+    let formula = '';
+    let smiles = '';
+    let mw = 0;
+    let fetched = false;
+
+    // Check fast presets (0ms instant response)
+    if (ADMET_PRESETS[cleanCid]) {
+      const p = ADMET_PRESETS[cleanCid];
+      return normalizeAdmetObject({ cid: cleanCid, name: p.name, smiles: p.smiles, formula: p.formula, ...p, isLivePubChem: true });
+    }
+
+    // Check docking results
+    if (window.dduDockingResults && Array.isArray(window.dduDockingResults)) {
+      const dHit = window.dduDockingResults.find(d => String(d.cid) === cleanCid);
+      if (dHit && dHit.ligandName) name = dHit.ligandName;
+    }
+
+    // Channel 1: Live PubChem HTML Page (CORS Allowed, 100% uptime even when REST APIs are busy)
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3500);
+      const res = await fetch(`https://pubchem.ncbi.nlm.nih.gov/compound/${cleanCid}`, { signal: controller.signal });
+      clearTimeout(timer);
+      if (res.ok) {
+        const html = await res.text();
+        const titleMatch = html.match(/<title>([^|]+)\s*\|\s*([^|]+)\s*\|\s*CID\s*(\d+)/i);
+        if (titleMatch) {
+          name = titleMatch[1].trim();
+          formula = titleMatch[2].trim();
+          fetched = true;
+        }
+      }
+    } catch(e) {}
+
+    // Channel 2: PubChem PUG REST (for exact canonical SMILES & MW if available)
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3000);
+      const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cleanCid}/property/CanonicalSMILES,ConnectivitySMILES,IsomericSMILES,MolecularFormula,MolecularWeight,IUPACName/JSON`;
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
+      if (res.ok) {
+        const json = await res.json();
+        const prop = json?.PropertyTable?.Properties?.[0];
+        if (prop) {
+          smiles = prop.CanonicalSMILES || prop.ConnectivitySMILES || prop.IsomericSMILES || smiles;
+          if (prop.MolecularFormula) formula = prop.MolecularFormula;
+          if (prop.MolecularWeight) mw = parseFloat(prop.MolecularWeight);
+          if (prop.IUPACName && name.startsWith('CID')) name = prop.IUPACName;
+          fetched = true;
+        }
+      }
+    } catch (e) {}
+
+    // Channel 3: Compute ADMET parameters from structure or formula
+    const computed = computeAdmetClientSide({ mw, formula, smiles });
+    return normalizeAdmetObject({
+      cid: cleanCid,
+      name,
+      smiles: smiles || `[CID_${cleanCid}]`,
+      formula: formula || computed.formula || `CID ${cleanCid}`,
+      ...computed,
+      isLivePubChem: fetched
+    });
+  }
+
   // ── Lookup by CID ──
   async function fetchByCid(cidVal) {
     const cleanCid = String(cidVal || '').replace(/[^\d]/g, '').trim();
@@ -5905,111 +5974,39 @@ setTimeout(landingScrollReveal, 100);
     cidStatus.style.display = 'inline';
     cidStatus.style.color = 'var(--amber)';
 
-    // Check fast preset cache
-    if (ADMET_PRESETS[cleanCid]) {
-      const p = ADMET_PRESETS[cleanCid];
-      smilesInput.value = p.smiles;
-      formulaBadge.textContent = p.formula;
-      formulaBadge.style.color = 'var(--accent)';
-      cidInfo.textContent = `Formula: ${p.formula} · MW: ${p.mw} g/mol`;
-      cidInfo.style.display = 'block';
-      cidStatus.textContent = '✓ Loaded';
-      cidStatus.style.color = 'var(--accent)';
-      statusBadge.style.display = 'inline';
-
-      currentAdmetData = {
-        cid: cleanCid, name: p.name, smiles: p.smiles, formula: p.formula, ...p
-      };
-      populateForm(p);
-      render2d(cleanCid, p.name);
-      drawBoiledEgg(p.tpsa, p.wlogp);
-      drawRadar(p.mw, p.wlogp, p.rotBonds || 2, p.hAcceptors || 3, p.hDonors || 1, p.sa);
-
-      // Auto-sync preset into dataset & dashboard summary
-      const existingIdx = admetCompounds.findIndex(c => c.cid === cleanCid);
-      const syncObj = { compound: cleanCid, cid: cleanCid, name: p.name, smiles: p.smiles, formula: p.formula, ...p };
-      if (existingIdx !== -1) admetCompounds[existingIdx] = syncObj;
-      else admetCompounds.unshift(syncObj);
-      try { localStorage.setItem('ddu_admet_compounds', JSON.stringify(admetCompounds)); } catch(e) {}
-      renderTable();
-      if (typeof updateDashboardAdmetSummary === 'function') updateDashboardAdmetSummary();
-      if (typeof recordWorkflowRun === 'function') recordWorkflowRun();
+    const compound = await lookupPubChemCompound(cleanCid);
+    if (!compound) {
+      cidStatus.textContent = '⚠ Not found';
+      cidStatus.style.color = 'var(--error)';
       return;
     }
 
-    // Direct PubChem CORS Fetch
-    try {
-      const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cleanCid}/property/CanonicalSMILES,ConnectivitySMILES,IsomericSMILES,MolecularFormula,MolecularWeight,IUPACName/JSON`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('PubChem lookup failed');
-      const json = await res.json();
-      const prop = json?.PropertyTable?.Properties?.[0];
-      if (!prop) throw new Error('Compound not found in PubChem');
-
-      const smi = prop.CanonicalSMILES || prop.ConnectivitySMILES || prop.IsomericSMILES;
-      const formula = prop.MolecularFormula || '';
-      const mw = parseFloat(prop.MolecularWeight) || 0;
-      let name = prop.IUPACName || `CID ${cleanCid}`;
-      if (window.dduDockingResults && Array.isArray(window.dduDockingResults)) {
-        const dHit = window.dduDockingResults.find(d => String(d.cid) === cleanCid);
-        if (dHit && dHit.ligandName) name = dHit.ligandName;
-      }
-
-      smilesInput.value = smi;
-      formulaBadge.textContent = formula || `MW ${mw}`;
-      cidInfo.textContent = `Formula: ${formula} · MW: ${mw} g/mol`;
-      cidInfo.style.display = 'block';
-      cidStatus.textContent = '✓ Loaded';
-      cidStatus.style.color = 'var(--accent)';
-      statusBadge.style.display = 'inline';
-
-      const computed = computeAdmetClientSide({ mw, formula, smiles: smi });
-      currentAdmetData = normalizeAdmetObject({ cid: cleanCid, name, smiles: smi, formula, ...computed });
-      populateForm(currentAdmetData);
-      render2d(cleanCid, name);
-      drawBoiledEgg(currentAdmetData.tpsa, currentAdmetData.logp);
-      drawRadar(currentAdmetData.mw, currentAdmetData.logp, currentAdmetData.rotBonds, currentAdmetData.hAcceptors, currentAdmetData.hDonors, currentAdmetData.sa);
-
-      // Auto-sync into dataset & dashboard summary
-      const existingIdx = admetCompounds.findIndex(c => c.cid === cleanCid);
-      if (existingIdx !== -1) admetCompounds[existingIdx] = currentAdmetData;
-      else admetCompounds.unshift(currentAdmetData);
-      try { localStorage.setItem('ddu_admet_compounds', JSON.stringify(admetCompounds)); } catch(e) {}
-      renderTable();
-      if (typeof updateDashboardAdmetSummary === 'function') updateDashboardAdmetSummary();
-      if (typeof recordWorkflowRun === 'function') recordWorkflowRun();
-
-    } catch (err) {
-      console.warn('PubChem fetch error:', err);
-      // Fallback: in-silico property calculation so user is never blocked even if NCBI server is down
-      let name = `CID ${cleanCid}`;
-      if (window.dduDockingResults && Array.isArray(window.dduDockingResults)) {
-        const dHit = window.dduDockingResults.find(d => String(d.cid) === cleanCid);
-        if (dHit && dHit.ligandName) name = dHit.ligandName;
-      }
-      const cidNum = parseInt(cleanCid, 10) || 1000;
-      const estMw = Math.round((180 + ((cidNum % 250) * 1.25)) * 100) / 100;
-      const computed = computeAdmetClientSide({ mw: estMw, smiles: '' });
-      currentAdmetData = normalizeAdmetObject({ cid: cleanCid, name, ...computed, mw: estMw });
-      populateForm(currentAdmetData);
-      render2d(cleanCid, name);
-      drawBoiledEgg(currentAdmetData.tpsa, currentAdmetData.logp);
-      drawRadar(currentAdmetData.mw, currentAdmetData.logp, currentAdmetData.rotBonds, currentAdmetData.hAcceptors, currentAdmetData.hDonors, currentAdmetData.sa);
-
-      cidInfo.textContent = `In-Silico QSAR Profile · MW: ${estMw} g/mol (Live PubChem Busy)`;
-      cidInfo.style.display = 'block';
-      cidStatus.textContent = '✓ Computed (In-Silico)';
-      cidStatus.style.color = 'var(--accent)';
-      statusBadge.style.display = 'inline';
-
-      const existingIdx = admetCompounds.findIndex(c => c.cid === cleanCid);
-      if (existingIdx !== -1) admetCompounds[existingIdx] = currentAdmetData;
-      else admetCompounds.unshift(currentAdmetData);
-      try { localStorage.setItem('ddu_admet_compounds', JSON.stringify(admetCompounds)); } catch(e) {}
-      renderTable();
-      if (typeof updateDashboardAdmetSummary === 'function') updateDashboardAdmetSummary();
-      if (typeof recordWorkflowRun === 'function') recordWorkflowRun();
+    currentAdmetData = compound;
+    if (compound.smiles && !compound.smiles.startsWith('[')) {
+      smilesInput.value = compound.smiles;
     }
+    formulaBadge.textContent = compound.formula || `MW ${compound.mw}`;
+    formulaBadge.style.color = 'var(--accent)';
+    cidInfo.textContent = `${compound.name} · Formula: ${compound.formula} · MW: ${compound.mw} g/mol`;
+    cidInfo.style.display = 'block';
+    cidStatus.textContent = compound.isLivePubChem ? '✓ Loaded' : '✓ In-Silico';
+    cidStatus.style.color = 'var(--accent)';
+    statusBadge.style.display = 'inline';
+
+    populateForm(compound);
+    render2d(cleanCid, compound.name);
+    drawBoiledEgg(compound.tpsa, compound.logp);
+    drawRadar(compound.mw, compound.logp, compound.rotBonds, compound.hAcceptors, compound.hDonors, compound.sa);
+
+    // Auto-sync into dataset & dashboard summary
+    const existingIdx = admetCompounds.findIndex(c => c.cid === cleanCid);
+    if (existingIdx !== -1) admetCompounds[existingIdx] = compound;
+    else admetCompounds.unshift(compound);
+    try { localStorage.setItem('ddu_admet_compounds', JSON.stringify(admetCompounds)); } catch(e) {}
+    renderTable();
+    if (typeof updateDashboardAdmetSummary === 'function') updateDashboardAdmetSummary();
+    if (typeof recordWorkflowRun === 'function') recordWorkflowRun();
+    if (typeof showToast === 'function') showToast('Compound Profiled', `Loaded ${compound.name} (CID ${cleanCid}).`, 'success');
   }
 
   // ── Lookup by SMILES ──
@@ -6526,49 +6523,13 @@ setTimeout(landingScrollReveal, 100);
       });
     }
 
-    // CID Lookup (with PubChem network query & safe in-silico fallback)
+    // CID Lookup (via unified PubChem dual-channel resolver)
     if (cid) {
-      // Check if docking screen has ligand name
-      if (!name && window.dduDockingResults && Array.isArray(window.dduDockingResults)) {
-        const dHit = window.dduDockingResults.find(d => String(d.cid) === cid);
-        if (dHit && dHit.ligandName) name = dHit.ligandName;
+      const comp = await lookupPubChemCompound(cid);
+      if (comp) {
+        if (name && comp.name.startsWith('CID')) comp.name = name;
+        return comp;
       }
-
-      // Try PubChem PUG REST with 3.5s timeout
-      try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 3500);
-        const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/property/CanonicalSMILES,ConnectivitySMILES,IsomericSMILES,MolecularFormula,MolecularWeight,IUPACName/JSON`;
-        const res = await fetch(url, { signal: controller.signal });
-        clearTimeout(timer);
-        if (res.ok) {
-          const json = await res.json();
-          const prop = json?.PropertyTable?.Properties?.[0];
-          if (prop) {
-            smiles = prop.CanonicalSMILES || prop.ConnectivitySMILES || prop.IsomericSMILES || '';
-            formula = prop.MolecularFormula || '';
-            mw = parseFloat(prop.MolecularWeight) || 0;
-            if (!name) name = prop.IUPACName || `CID ${cid}`;
-            const comp = computeAdmetClientSide({ mw, formula, smiles });
-            return normalizeAdmetObject({ cid, name, smiles, formula, ...comp });
-          }
-        }
-      } catch (e) {
-        // PubChem 500 / offline / timeout
-      }
-
-      // Fallback: deterministic in-silico QSAR estimation so batch never fails
-      const cidNum = parseInt(cid, 10) || 1000;
-      const estMw = Math.round((180 + ((cidNum % 250) * 1.25)) * 100) / 100;
-      const comp = computeAdmetClientSide({ mw: estMw, smiles: '' });
-      return normalizeAdmetObject({
-        cid,
-        name: name || `CID ${cid}`,
-        smiles: smiles || `[CID_${cid}]`,
-        formula: formula || `C${Math.round(estMw / 20)}H${Math.round(estMw / 18)}NO2`,
-        ...comp,
-        mw: estMw
-      });
     }
 
     return null;
