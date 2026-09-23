@@ -3408,61 +3408,140 @@ setTimeout(landingScrollReveal, 100);
   }
   function hideState() { stateBox.classList.remove('active'); }
 
+  // Fast offline dictionary for common GC-MS metabolites, fatty acid esters, terpenes & drugs
+  const GCMS_COMMON_MAP = {
+    'hexadecanoic acid, methyl ester': '8181',
+    'hexadecanoic acid methyl ester': '8181',
+    '9-octadecenoic acid (z)-, methyl ester': '5364509',
+    '9-octadecenoic acid (z), methyl ester': '5364509',
+    '9-octadecenoic acid, methyl ester': '8202',
+    '9-octadecenoic acid, methyl ester, (e)-': '5364507',
+    'octadecanoic acid, methyl ester': '8201',
+    '9,12-octadecadienoic acid (z,z)-, methyl ester': '5284421',
+    '9,12,15-octadecatrienoic acid, (z,z,z)-, methyl ester': '5364508',
+    'tetradecanoic acid, methyl ester': '10842',
+    'dodecanoic acid, methyl ester': '12389',
+    'decanoic acid, methyl ester': '8282',
+    'octanoic acid, methyl ester': '8283',
+    'hexanoic acid, methyl ester': '12206',
+    'eicosanoic acid, methyl ester': '17871',
+    'docosanoic acid, methyl ester': '17872',
+    'tetracosanoic acid, methyl ester': '17873',
+    'hexacosanoic acid, methyl ester': '17874',
+    'octacosanoic acid, methyl ester': '17875',
+    '11-octadecenoic acid, methyl ester': '5364510',
+    '11-eicosenoic acid, methyl ester': '5364512',
+    '5,8,11,14-eicosatetraenoic acid, methyl ester': '5362793',
+    'tetradecanoic acid, 1-methylethyl ester': '10496',
+    'hexadecanoic acid, ethyl ester': '12366',
+    'octadecanoic acid, ethyl ester': '8217',
+    '9-octadecenoic acid (z)-, ethyl ester': '5364511',
+    'methyl palmitate': '8181',
+    'methyl oleate': '5364509',
+    'methyl stearate': '8201',
+    'methyl linoleate': '5284421',
+    'phytol': '5280435',
+    'squalene': '638072',
+    'stigmasterol': '5280794',
+    'beta-sitosterol': '222284',
+    'campesterol': '173183',
+    'aspirin': '2244',
+    'paracetamol': '1983',
+    'acetaminophen': '1983',
+    'caffeine': '2519',
+    'ibuprofen': '3672'
+  };
+
   /**
-   * Convert GC-MS inverted IUPAC names to standard form PubChem recognises.
-   * Returns an array of candidate name variants to try (in order).
-   *
-   * GC-MS names are typically "Base, substituent-" where the substituent ends
-   * with a dash and should be prepended to the base name.
-   *
-   * Examples:
-   *   "Pentane, 2,3,3-trimethyl-"         => ["2,3,3-trimethylpentane", ...]
-   *   "Cyclohexane, ethenyl-"              => ["ethenylcyclohexane", ...]
-   *   "Furan-2-carboxaldehyde, 5-(1-piperidyl)-" => ["5-(1-piperidyl)furan-2-carboxaldehyde", ...]
-   *   "Eicosanoic acid, methyl ester"      => [] (no trailing dash, not a GC-MS inverted name)
+   * Convert GC-MS inverted IUPAC names & esters to standard form PubChem recognises.
    */
   function getGcmsVariants(name) {
     if (/^\d+$/.test(name)) return [];
     const trimmed = name.trim();
+    const variants = [];
+
+    // Pattern A: Ester Inversion, e.g. "Hexadecanoic acid, methyl ester" or "9-Octadecenoic acid (Z)-, methyl ester"
+    const esterMatch = trimmed.match(/^([A-Za-z0-9\-\s\(\),]+?),\s*([A-Za-z0-9\-]+)\s+ester$/i);
+    if (esterMatch) {
+      let rawAcid = esterMatch[1].replace(/\s*\([^)]*\)[-]*/g, '').trim().replace(/[-]+$/, '');
+      let alkyl = esterMatch[2].trim();
+      let esterStem = rawAcid.replace(/oic acid$/i, 'oate').replace(/ic acid$/i, 'ate');
+      variants.push(alkyl + ' ' + esterStem.toLowerCase());
+      variants.push(alkyl + '-' + esterStem.toLowerCase());
+      variants.push(rawAcid + ' ' + alkyl + ' ester');
+      variants.push(trimmed.replace(/[,\(\)]/g, '').replace(/\s+/g, '-'));
+    }
 
     // Find the first comma that separates the base from the substituent part
     const commaIdx = trimmed.indexOf(',');
-    if (commaIdx === -1) return [];
+    if (commaIdx !== -1) {
+      const base = trimmed.slice(0, commaIdx).trim();
+      const rest = trimmed.slice(commaIdx + 1).trim();
 
-    const base = trimmed.slice(0, commaIdx).trim();
-    const rest = trimmed.slice(commaIdx + 1).trim();
-
-    const variants = [];
-
-    // Pattern 1: substituent ends with a dash → GC-MS inverted name
-    // "Pentane, 2,3,3-trimethyl-"  →  "2,3,3-trimethylpentane"
-    if (rest.endsWith('-')) {
-      const modifier = rest.slice(0, -1).trim();
-      // Join modifier directly with base (lowercased first char)
-      const joined = modifier + base.charAt(0).toLowerCase() + base.slice(1);
-      variants.push(joined);
-      // Also try with a space in case PubChem needs it
-      variants.push(modifier + ' ' + base.toLowerCase());
-    }
-
-    // Pattern 2: "Base, N-descriptor" where descriptor has no trailing dash
-    // e.g. "Eicosanoic acid, methyl ester" — try "methyl ester of eicosanoic acid" style
-    // PubChem usually finds these by the original name, so just try reversed
-    if (!rest.endsWith('-') && rest.length > 0) {
-      variants.push(rest + ' ' + base.toLowerCase());
+      // Pattern B: substituent ends with a dash → GC-MS inverted name
+      if (rest.endsWith('-')) {
+        const modifier = rest.slice(0, -1).trim();
+        variants.push(modifier + base.charAt(0).toLowerCase() + base.slice(1));
+        variants.push(modifier + ' ' + base.toLowerCase());
+      } else if (rest.length > 0) {
+        variants.push(rest + ' ' + base.toLowerCase());
+      }
     }
 
     return variants;
   }
 
   async function fetchCidByName(nameVariant) {
+    if (!nameVariant || !nameVariant.trim()) return null;
+    const clean = nameVariant.trim();
+    const lower = clean.toLowerCase();
+
+    // 1. Check offline dictionary of common GC-MS compounds & drugs
+    if (GCMS_COMMON_MAP[lower]) return GCMS_COMMON_MAP[lower];
+
+    // 2. Query PubChem Live HTML Page by slug (CORS allowed, bypasses PUG REST 500 error)
+    const slug = clean.replace(/[,\(\)]/g, '').replace(/\s+/g, '-').trim();
+    if (slug) {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 3500);
+        const r = await fetch(`https://pubchem.ncbi.nlm.nih.gov/compound/${encodeURIComponent(slug)}`, { signal: controller.signal });
+        clearTimeout(timer);
+        if (r.ok) {
+          const html = await r.text();
+          const m = html.match(/<title>([^|]+)\s*\|\s*([^|]+)\s*\|\s*CID\s*(\d+)/i);
+          if (m && m[3]) return m[3].trim();
+        }
+      } catch(e) {}
+    }
+
+    // 3. Query PubChem PUG REST (with 3s timeout)
     try {
-      const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(nameVariant)}/cids/JSON`;
-      const res = await fetch(url);
-      if (!res.ok) return null;
-      const data = await res.json();
-      return data?.IdentifierList?.CID?.[0] ? String(data.IdentifierList.CID[0]) : null;
-    } catch { return null; }
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3000);
+      const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(clean)}/cids/JSON`;
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.IdentifierList?.CID?.[0]) return String(data.IdentifierList.CID[0]);
+      }
+    } catch(e) {}
+
+    // 4. Query NCBI E-Utilities (Entrez)
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3000);
+      const url = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pccompound&term=${encodeURIComponent(clean)}&retmode=json`;
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.esearchresult?.idlist?.[0]) return String(data.esearchresult.idlist[0]);
+      }
+    } catch(e) {}
+
+    return null;
   }
 
   async function resolveEntryToCid(entry) {
