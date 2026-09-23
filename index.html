@@ -1548,6 +1548,7 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-
 .docking-drop-zone:hover { border-color: var(--accent-dim); background: rgba(127,231,196,0.03); }
 .docking-drop-zone.drag-over { border-color: var(--accent); background: rgba(127,231,196,0.06); }
 .docking-drop-zone > *:not(input) { position: relative; z-index: 1; pointer-events: none; }
+.docking-drop-zone button, #dockingBrowseBtn { pointer-events: auto !important; position: relative; z-index: 5; }
 
 .docking-file-item {
   display: flex; align-items: center; gap: 10px;
@@ -2601,6 +2602,7 @@ setTimeout(landingScrollReveal, 100);
             Drag & drop <strong>.xlsx</strong> files here, or
           </div>
           <button type="button" id="dockingBrowseBtn" style="padding:8px 20px;background:var(--accent);color:#000;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:6px;">Browse Files</button>
+          <button type="button" id="dockingSampleBtn" style="padding:8px 16px;background:rgba(127,231,196,0.12);color:var(--accent);border:1px solid rgba(127,231,196,0.25);border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;margin-left:8px;margin-bottom:6px;">Try Sample Docking Data</button>
           <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Each file = 1 protein · Max 15 files</div>
           <input type="file" id="dockingFileInput" multiple style="display:none;">
         </div>
@@ -4395,9 +4397,9 @@ setTimeout(landingScrollReveal, 100);
   }
 
   async function handleFiles(files) {
-    const fileArray = Array.from(files).filter(f => /\.(xlsx|xls)$/i.test(f.name));
+    const fileArray = Array.from(files).filter(f => /\.(xlsx|xls|csv|tsv|txt)$/i.test(f.name));
     if (fileArray.length === 0) {
-      if (typeof showToast === 'function') showToast('Invalid file', 'Please upload .xlsx files only.', 'error');
+      if (typeof showToast === 'function') showToast('Invalid file', 'Please upload .xlsx, .xls, .csv, or .tsv files.', 'error');
       return;
     }
 
@@ -4412,7 +4414,7 @@ setTimeout(landingScrollReveal, 100);
     for (const file of toProcess) {
       try {
         const sheetData = await readExcelFile(file);
-        const proteinName = file.name.replace(/\.(xlsx|xls)$/i, '');
+        const proteinName = file.name.replace(/\.(xlsx|xls|csv|tsv|txt)$/i, '');
         dockingFiles.push({ name: proteinName, size: file.size, sheetData });
       } catch (err) {
         if (typeof showToast === 'function') showToast('Read error', 'Failed to read ' + file.name + ': ' + err.message, 'error');
@@ -4440,6 +4442,11 @@ setTimeout(landingScrollReveal, 100);
       dropZone.classList.remove('drag-over');
       handleFiles(e.dataTransfer.files);
     });
+    dropZone.addEventListener('click', (e) => {
+      if (e.target.tagName !== 'BUTTON' && fileInput) {
+        fileInput.click();
+      }
+    });
     // Also handle drag events on the input overlay itself
     if (fileInput) {
       fileInput.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
@@ -4464,6 +4471,56 @@ setTimeout(landingScrollReveal, 100);
   }
 
   // ─── Process & Rank ───
+  
+  // ─── Try Sample Docking Data ───
+  const sampleDockingBtn = document.getElementById('dockingSampleBtn');
+  sampleDockingBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dockingFiles = [
+      {
+        name: 'EGFR_Kinase_Domain',
+        size: 15420,
+        sheetData: [
+          { 'Ligand Name': 'Gefitinib', 'PubChem CID': '123631', 'Docking Score': -9.4 },
+          { 'Ligand Name': 'Erlotinib', 'PubChem CID': '176870', 'Docking Score': -8.9 },
+          { 'Ligand Name': 'Afatinib', 'PubChem CID': '10184653', 'Docking Score': -9.7 },
+          { 'Ligand Name': 'Osimertinib', 'PubChem CID': '71496458', 'Docking Score': -10.2 },
+          { 'Ligand Name': 'Lapatinib', 'PubChem CID': '208908', 'Docking Score': -8.4 },
+          { 'Ligand Name': 'Brigatinib', 'PubChem CID': '68165256', 'Docking Score': -8.1 },
+          { 'Ligand Name': 'Imatinib', 'PubChem CID': '5291', 'Docking Score': -7.5 }
+        ]
+      },
+      {
+        name: 'CDK2_CellCycle',
+        size: 14200,
+        sheetData: [
+          { 'Ligand Name': 'Gefitinib', 'PubChem CID': '123631', 'Docking Score': -8.1 },
+          { 'Ligand Name': 'Erlotinib', 'PubChem CID': '176870', 'Docking Score': -7.8 },
+          { 'Ligand Name': 'Afatinib', 'PubChem CID': '10184653', 'Docking Score': -8.6 },
+          { 'Ligand Name': 'Osimertinib', 'PubChem CID': '71496458', 'Docking Score': -9.1 },
+          { 'Ligand Name': 'Lapatinib', 'PubChem CID': '208908', 'Docking Score': -7.9 },
+          { 'Ligand Name': 'Dinaciclib', 'PubChem CID': '46926350', 'Docking Score': -10.8 },
+          { 'Ligand Name': 'Imatinib', 'PubChem CID': '5291', 'Docking Score': -7.1 }
+        ]
+      },
+      {
+        name: 'COVID_Mpro_3CL',
+        size: 16180,
+        sheetData: [
+          { 'Ligand Name': 'Gefitinib', 'PubChem CID': '123631', 'Docking Score': -7.6 },
+          { 'Ligand Name': 'Erlotinib', 'PubChem CID': '176870', 'Docking Score': -7.3 },
+          { 'Ligand Name': 'Afatinib', 'PubChem CID': '10184653', 'Docking Score': -8.1 },
+          { 'Ligand Name': 'Osimertinib', 'PubChem CID': '71496458', 'Docking Score': -8.8 },
+          { 'Ligand Name': 'Lapatinib', 'PubChem CID': '208908', 'Docking Score': -7.2 },
+          { 'Ligand Name': 'Nirmatrelvir', 'PubChem CID': '155903259', 'Docking Score': -9.5 },
+          { 'Ligand Name': 'Imatinib', 'PubChem CID': '5291', 'Docking Score': -6.8 }
+        ]
+      }
+    ];
+    updateFileUI();
+    if (typeof showToast === 'function') showToast('Sample Loaded', 'Loaded docking results for 3 proteins. Click "Analyze & Rank" to process.', 'success');
+  });
+
   processBtn?.addEventListener('click', processDockingFiles);
 
   async function processDockingFiles() {
@@ -4822,8 +4879,7 @@ setTimeout(landingScrollReveal, 100);
     for (const l of data) {
       rows.push([l.rank, '"'+l.ligandName.replace(/"/g,'""')+'"', l.cid, l.avgScore, l.bestScore, l.proteinCount+'/'+l.totalProteins, l.coverage+'%', '"'+l.proteinList.join('; ').replace(/"/g,'""')+'"']);
     }
-    const csv = rows.map(r => r.join(',')).join('
-');
+    const csv = rows.map(r => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -4851,8 +4907,7 @@ setTimeout(landingScrollReveal, 100);
 
     const cidInputEl = document.getElementById('cidInput');
     if (cidInputEl) {
-      cidInputEl.value = cids.join('
-');
+      cidInputEl.value = cids.join('\n');
       cidInputEl.dispatchEvent(new Event('input'));
     }
 
