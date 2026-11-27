@@ -15,15 +15,16 @@
   const legacy = storageGet('ddu_admet_compounds');
   root.classList.add('admet-source-app');
   root.innerHTML = `
-    <div class="source-kicker">SwissADME + ProTox 3.0 · source-only records</div>
-    <h2>ADMET profiling</h2>
+    <div class="source-kicker">02 / Investigate · SwissADME + ProTox 3.0</div>
+    <h1 class="source-title" tabindex="-1">ADMET <em>evidence.</em></h1>
     <p class="source-muted">Import SwissADME output and retrieve ProTox predictions. No local ADMET calculations, preset results, or invented missing values.</p>
+    <nav class="source-step-nav" aria-label="ADMET workflow"><a href="#admetIdentitySection"><span>01</span> Compounds</a><a href="#admetProviderSection"><span>02</span> Providers</a><a href="#admetImportSection"><span>03</span> Import results</a><a href="#admetSourceDataset"><span>04</span> Review &amp; export</a></nav>
     <div class="source-notice"><strong>Predictions, not proof of safety or efficacy.</strong> SwissADME prohibits automated access: run its website yourself, then import its exported results here. ProTox uses its published API where this host supports it. Imported text/files are user-supplied and are not independently authenticated.</div>
     <div id="admetLegacyWarning" class="source-notice" ${!legacy && !loaded.excluded ? 'hidden' : ''}>Older/invalid ADMET records lack reliable source evidence and are excluded from all current profiles, statistics and reports. Their original storage has not been deleted. <button id="admetLegacyExport">Download legacy data for review</button></div>
     <div id="admetStorageWarning" class="source-notice" hidden></div>
     <div id="admetSourceMessage" role="status" aria-live="polite" hidden></div>
-    <div class="source-card">
-      <h3>1. Choose the exact compounds</h3>
+    <div class="source-card" id="admetIdentitySection">
+      <h3><span class="source-section-number">01</span>Choose the exact compounds</h3>
       <p class="source-muted">Up to 500 records. PubChem supplies identity/SMILES only, never ADMET values. Stereochemistry, charges and salts are retained. Names alone are not used to merge predictions.</p>
       <div class="source-grid">
         <div><label for="admetIdentityType">Identifier type</label><select id="admetIdentityType"><option value="smiles">SMILES — one structure per line</option><option value="cid">PubChem CID — one CID per line</option></select></div>
@@ -32,7 +33,7 @@
       <label for="admetIdentityInput">Structures / identifiers</label><textarea id="admetIdentityInput" spellcheck="false" placeholder="Paste exact SMILES, one per line. Or select PubChem CID above."></textarea>
       <div class="source-actions"><button class="source-primary" id="admetAddIdentity">Add structures — no predictions</button><button id="admetFromPubchem" ${root.dataset.standalone ? 'hidden' : ''}>Use resolved PubChem rows</button></div>
     </div>
-    <div class="source-grid">
+    <div class="source-grid" id="admetProviderSection">
       <section class="source-card"><div class="source-kicker">ADME · manual provider run</div><h3>SwissADME</h3>
         <p class="source-muted">Download input batches of at most 200, run each sequentially on SwissADME, then upload its CSV below. Do not run batches simultaneously. Its BOILED-Egg and radar graphics are available on the provider site; this app does not recreate them with approximations.</p>
         <div class="source-actions"><button id="admetSwissInputs">Prepare SwissADME batches</button><a href="https://www.swissadme.ch/" target="_blank" rel="noopener noreferrer">Open SwissADME ↗</a></div>
@@ -47,8 +48,8 @@
         <p class="source-muted"><a href="https://tox.charite.de/protox3/" target="_blank" rel="noopener noreferrer">Open ProTox ↗</a> · <a href="https://tox.charite.de/protox3/index.php?site=faq" target="_blank" rel="noopener noreferrer">API and confidence definitions</a></p>
       </section>
     </div>
-    <section class="source-card">
-      <h3>2. Import actual provider results</h3>
+    <section class="source-card" id="admetImportSection">
+      <h3><span class="source-section-number">03</span>Import actual provider results</h3>
       <p class="source-muted">CSV/TSV is preferred. For pasted text, include the full result panel and SMILES. Recognized fields are read without recomputation; unrecognized pasted fields remain in the original evidence, not in numeric summaries. Check source identity before importing. Differently written SMILES are kept separate rather than guessed to be equivalent.</p>
       <div class="source-grid">
         <div><label for="admetImportProvider">Provider</label><select id="admetImportProvider"><option value="swissadme">SwissADME</option><option value="protox">ProTox 3.0</option></select></div>
@@ -63,7 +64,7 @@
       <div class="source-actions"><button id="admetImportResults" class="source-primary">Import source values</button><button id="admetClearSource">Clear import</button></div>
     </section>
     <section class="source-card" id="admetSourceDataset">
-      <h3>3. Review the dataset &amp; evidence</h3>
+      <h3><span class="source-section-number">04</span>Review the dataset &amp; evidence</h3>
       <div id="admetSourceMetrics" class="source-metrics"></div>
       <div class="source-actions"><label for="admetSourceFilter">Filter records</label><input id="admetSourceFilter" style="max-width:290px" placeholder="Label, CID or SMILES"><button id="admetClearProfiles" class="source-delete">Clear current dataset</button></div>
       <div class="source-table-wrap"><table id="admetSourceTable"><thead><tr><th>Compound</th><th>SwissADME</th><th>ProTox 3.0</th><th>Review</th></tr></thead><tbody id="admetSourceRows"></tbody></table></div>
@@ -71,7 +72,7 @@
       <p class="source-muted">Exports preserve reported precision and confidence meanings. “Not available” never means zero, inactive or safe. Identity metadata may be user-supplied or resolved by PubChem; all ADMET descriptors/predictions are attributed separately.</p>
     </section>
     <section class="source-card" id="admetSelectedRecord"><h3>Selected profile</h3><div id="admetSourceDetails" class="source-muted">Select a record to view individual source values.</div></section>
-    <section class="source-card" id="admetHistorySection" hidden><h3>Saved sessions</h3><p class="source-muted">Save source evidence with your signed-in account. Legacy sessions are downloadable for review but are never treated as source-verified profiles.</p><div class="source-actions"><input id="historySessionName" placeholder="Session name (optional)" style="max-width:280px"><button id="historySaveBtn">Save session</button><button id="historyRefreshBtn">Refresh</button></div><div id="historyMsg" role="status"></div><div id="historyList"></div></section>
+    <section class="source-card" id="admetHistorySection" hidden><h3>Saved sessions</h3><p class="source-muted">Save source evidence with your signed-in account. Legacy sessions are downloadable for review but are never treated as source-verified profiles.</p><div class="source-actions"><input id="historySessionName" aria-label="Session name" placeholder="Session name (optional)" style="max-width:280px"><button id="historySaveBtn">Save session</button><button id="historyRefreshBtn">Refresh</button></div><div id="historyMsg" role="status"></div><div id="historyList"></div></section>
     <p class="source-muted">Citations: Daina et al., SwissADME (2017), DOI 10.1038/srep42717 · Banerjee et al., ProTox 3.0 (2024), DOI 10.1093/nar/gkae303. Source versions are recorded where supplied; provider outputs may change over time.</p>`;
 
   function message(text, error = false) {
@@ -139,10 +140,10 @@
     if (!container) return;
     const withValues = profiles.filter(p => Object.keys(p.values).length);
     if ($('dashAdmetBadge')) $('dashAdmetBadge').textContent = `${withValues.length} with source values · ${profiles.length - withValues.length} pending`;
-    container.innerHTML = `<p style="color:var(--text-dim);font-size:13px;line-height:1.7">SwissADME and ProTox predictions only. Missing endpoints are unknown, not safe. These results do not establish potency or clinical safety.</p><div style="max-height:340px;overflow:auto">${profiles.length ? profiles.map(p => {
+    container.innerHTML = `<p class="dash-evidence-note">SwissADME and ProTox predictions only. Missing endpoints are unknown, not safe. These results do not establish potency or clinical safety.</p><div class="dash-evidence-records">${profiles.length ? profiles.map(p => {
       const active = Object.values(p.values).filter(value => value.source === 'protox' && value.value === 'Active');
-      return `<div style="padding:12px 0;border-bottom:1px solid var(--panel-line)"><strong>${esc(nameOf(p))}</strong><div style="color:var(--text-dim);font-size:12px">SwissADME: ${esc(S.status(p, 'swissadme'))} · ProTox: ${esc(S.status(p, 'protox'))}</div><div style="font-size:12px;color:var(--amber)">${active.length ? `Predicted active endpoints: ${active.map(e => esc(e.label)).join(', ')}` : 'No active endpoint recorded; this is not evidence of safety.'}</div></div>`;
-    }).join('') : '<p>No source records yet. Import provider output in ADMET Profiling to begin.</p>'}</div>`;
+      return `<div class="dash-evidence-record"><strong>${esc(nameOf(p))}</strong><div>SwissADME: ${esc(S.status(p, 'swissadme'))} · ProTox: ${esc(S.status(p, 'protox'))}</div><p>${active.length ? `Predicted active endpoints: ${active.map(e => esc(e.label)).join(', ')}` : 'No active endpoint recorded; this is not evidence of safety.'}</p></div>`;
+    }).join('') : '<div class="dash-evidence-empty"><span class="edition-label">No source records yet</span><p>The evidence starts here.</p><span>Import provider output in ADMET Profiling to begin.</span></div>'}</div>`;
   }
   async function addIdentifiers(raw, type = 'cid', label = '') {
     if (busy) return;

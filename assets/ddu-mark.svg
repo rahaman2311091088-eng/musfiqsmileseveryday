@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" fill="none">
+  <title>Drug Design Universe — nested D monogram</title>
+  <path d="M11 9h17c16 0 28 11 28 27S44 63 28 63H11V9Z" stroke="#242F32" stroke-width="4.5"/>
+  <path d="M23 21h6c9 0 15 6 15 15s-6 15-15 15h-6V21Z" stroke="#242F32" stroke-width="4.5"/>
+  <path d="M59 33v12c0 12-9 21-21 21" stroke="#B5442D" stroke-width="3" stroke-linecap="square"/>
+  <path d="M55 6h9v9h-9z" fill="#B5442D"/>
+</svg>

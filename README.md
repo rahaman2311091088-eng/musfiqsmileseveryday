@@ -6,6 +6,17 @@ Research platform with PubChem batch lookup, source-only ADMET records and docki
 python3 -m http.server 4173 --bind 0.0.0.0
 ```
 
+## Research Edition interface
+
+The cover, sign-in screen, workbench, compound lookup, ADMET interface and docking view share a new editorial design: warm paper, dark ink, restrained vermilion, a custom DDU monogram and a matching favicon. There are no particle fields, cursor glows, decorative dashboard simulations or seeded global usage counters.
+
+- `assets/site.css` is the shared design system; `assets/admet-source-ui.css` styles the evidence workflow on both entry points. Deploy both, the SVG assets, and the complete `assets/fonts/` directory.
+- DM Sans, Newsreader and IBM Plex Mono are self-hosted WOFF2 fonts with `font-display: swap` and system fallbacks. Original SIL Open Font Licenses are included in `assets/fonts/`. There are no Google Fonts requests.
+- The cover uses a finite SVG line-drawing animation and one-time intersection reveals. `prefers-reduced-motion` is honored. The **Motion** button saves a browser-local preference (`ddu_motion`); the overview and native FAQ remain readable without JavaScript. The molecular illustration is explicitly illustrative, not a provider prediction.
+- Desktop and mobile navigation use real buttons, shared active state, keyboard focus handling, and consistent headers. Account access has a back action and keyboard submission; standalone ADMET can now sign in without redirecting to the cover. Dialogs trap focus and restore their opener. Filtered command-palette actions resolve the selected filtered command, not its old unfiltered index.
+- Workbench metrics refer only to actions recorded in this browser. `ddu_stats` retains local counters; `ddu_recent_activity_v1` keeps at most five completion summaries (type, counts/description and time, **not molecular data**). These are not cross-device analytics or global researcher counts. Damaged optional statistics cannot block the workspace.
+- The docking sample is marked **illustrative, not predictions or experimental results**. The PubChem resolver, 500-compound limit, ADMET parser/evidence schema, provider restrictions and export formats are unchanged.
+
 ## Reliable PubChem batch lookup
 
 The batch lookup in `index.html` uses `assets/pubchem-lookup.js`. **Deploy the `assets/` directory along with the HTML files.** No backend, API key or new production dependency is required.
@@ -98,7 +109,7 @@ Use Node.js 22+ for the dependency-free resolver, source parser, API adapter/cli
 npm test
 ```
 
-Browser regression tests use Playwright:
+Browser regression tests use Playwright and axe-core for automated accessibility checks:
 
 ```sh
 npm ci
@@ -106,4 +117,6 @@ npx playwright install --with-deps chromium
 npm run test:browser
 ```
 
-An existing Chromium installation can be used via `CHROMIUM_EXECUTABLE_PATH`. The browser tests start a local static server if port 4173 is not already serving the site. All chemical API, authentication and CDN responses are mocked, so these tests need no login or database access. They cover name normalization, exact matching, ambiguity, rate limiting, timeouts, outages, partial property batches, caching, concurrency, retry/correction, preserved inputs, filtering/pagination, and exports. ADMET tests cover both entry points, 500-record batch identity matching, missing/zero handling, model separation, confidence semantics, malformed source output, legacy isolation, Word/CSV/JSON evidence, queued API association, cancellation, quota errors, source-URL restrictions, authentication and adapter size limits. Test values are deliberately chosen fixtures, **not genuine predictions for the fixture structures**. The checks do not establish biological accuracy, live provider availability or whether a particular literature name is currently indexed in PubChem.
+An existing Chromium installation can be used via `CHROMIUM_EXECUTABLE_PATH`. The browser tests start a local static server if port 4173 is not already serving the site. All chemical API, authentication and CDN responses are mocked, so these tests need no login or database access. They cover name normalization, exact matching, ambiguity, rate limiting, timeouts, outages, partial property batches, caching, concurrency, retry/correction, preserved inputs, filtering/pagination, and exports. ADMET tests cover both entry points, 500-record batch identity matching, missing/zero handling, model separation, confidence semantics, malformed source output, legacy isolation, Word/CSV/JSON evidence, queued API association, cancellation, quota errors, source-URL restrictions, authentication and adapter size limits. Design regressions additionally cover local fonts/identity, native FAQ behavior without JavaScript, guest/sign-in/back/sign-out flows, instrument entry, filtered commands, dialog focus, motion preferences, standalone access, docking sample export, local activity, and overflow at 320/390/768/1024/1440 px. Axe scans check the cover, account and workspace states against WCAG 2 A/AA and 2.1 AA rules. Scans use settled reduced-motion states to avoid measuring intermediate reveal opacity; normal and reduced motion are separately tested. Automated scans are not a claim of complete accessibility certification.
+
+Test values are deliberately chosen fixtures, **not genuine predictions for the fixture structures**. The checks do not establish biological accuracy, live provider availability or whether a particular literature name is currently indexed in PubChem.
