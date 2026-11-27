@@ -229,10 +229,10 @@ test('exhausted property retries keep the CID but never invent formula, mass or 
   assert.equal(row.smiles, '');
 });
 
-test('a 50-name outage has bounded traffic and cannot turn into 50 false not-found results', async () => {
+test('a 500-name outage has bounded traffic and cannot turn into 500 false not-found results', async () => {
   let calls = 0;
   const client = fastClient(async () => { calls++; throw new TypeError('offline'); }, { maxRetries: 2 });
-  const rows = await client.lookupEntries(Array.from({ length: 50 }, (_, i) => `Compound ${i}`));
+  const rows = await client.lookupEntries(Array.from({ length: 500 }, (_, i) => `Compound ${i}`));
   assert(rows.every(row => row.errorType === 'network'));
   assert(calls <= 12, `${calls} requests should be bounded by the two services and workers`);
 });
@@ -293,7 +293,7 @@ test('partial property responses retry only missing CIDs', async () => {
 test('property outage is not fanned out into one request for each CID', async () => {
   let calls = 0;
   const client = fastClient(async () => { calls++; return json({}, 503); });
-  const rows = await client.lookupEntries(Array.from({ length: 50 }, (_, i) => String(i + 1)));
+  const rows = await client.lookupEntries(Array.from({ length: 500 }, (_, i) => String(i + 1)));
   assert(rows.every(row => row.errorType === 'unavailable'));
   assert(calls <= 2, `${calls} requests`);
 });
@@ -370,16 +370,46 @@ test('an empty property record is an invalid response, not a fabricated success'
   assert.equal(row.formula, '');
 });
 
-test('50 valid CIDs use three bounded property batches and keep input order', async () => {
-  const groups = [];
-  const inputs = Array.from({ length: 50 }, (_, i) => String(i + 1));
-  const client = fastClient(async url => {
+for (const size of [50, 500]) {
+  test(`${size} valid CIDs use bounded property batches and keep input order`, async () => {
+    const groups = [];
+    const inputs = Array.from({ length: size }, (_, i) => String(i + 1));
+    const client = fastClient(async url => {
+      const cids = propertyCids(url);
+      groups.push(cids);
+      return properties(cids);
+    });
+    const rows = await client.lookupEntries(inputs);
+    assert.deepEqual(groups.map(group => group.length),
+      Array.from({ length: Math.ceil(size / 20) }, (_, i) => Math.min(20, size - i * 20)));
+    assert(rows.every(row => !row.error));
+    assert.deepEqual(rows.map(row => row.inputLabel), inputs);
+  });
+}
+
+test('500 compound names resolve completely without increasing request concurrency', async () => {
+  let active = 0;
+  let peak = 0;
+  let names = 0;
+  let batches = 0;
+  const inputs = Array.from({ length: 500 }, (_, i) => `Compound ${i + 1}`);
+  const client = fastClient(async (url, init) => {
+    peak = Math.max(peak, ++active);
+    await delay(1);
+    active--;
     const cids = propertyCids(url);
-    groups.push(cids);
-    return properties(cids);
+    if (cids) {
+      batches++;
+      assert(cids.length <= 20);
+      return properties(cids);
+    }
+    names++;
+    return ids(Number(nameIn(init).replace('Compound ', '')));
   });
   const rows = await client.lookupEntries(inputs);
-  assert.deepEqual(groups.map(group => group.length), [20, 20, 10]);
+  assert.equal(names, 500);
+  assert.equal(batches, 25);
+  assert.equal(peak, 2);
   assert(rows.every(row => !row.error));
   assert.deepEqual(rows.map(row => row.inputLabel), inputs);
 });

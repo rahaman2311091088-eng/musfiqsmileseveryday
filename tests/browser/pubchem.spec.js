@@ -219,3 +219,78 @@ test('one spreadsheet export contains provenance; unresolved CSV is separate and
   expect(exported[0]).toMatchObject({ 'Original input': 'Methyl ferulate', 'PubChem CID': '101', 'Match method': 'PubChem exact name' });
   expect(errors).toEqual([]);
 });
+
+test('500 molecules can be fetched in one batch, paginated, searched and exported', async ({ page }) => {
+  const groups = [];
+  const errors = await openLookup(page, route => {
+    groups.push(propertyIds(route));
+    return propertyReply(route);
+  });
+  await expect(page.locator('#countBadge')).toHaveText('0 / 500');
+  await expect(page.locator('label[for="cidInput"]')).toContainText('max 500');
+  const inputs = Array.from({ length: 500 }, (_, i) => String(i + 1));
+  await run(page, inputs);
+  await expect(page.locator('#countBadge')).toHaveText('500 / 500');
+  await expect(page.locator('#countBadge')).not.toHaveClass(/over/);
+  await expect(page.locator('#resultsTitle')).toHaveText('500 of 500 resolved');
+  expect(groups).toHaveLength(25);
+  expect(groups.every(group => group.length === 20)).toBe(true);
+  expect(groups.flat()).toEqual(inputs);
+  await expect(page.locator('#resultsBody tr')).toHaveCount(20);
+  await expect(page.locator('#paginationInfo')).toHaveText('Showing 1–20 of 500');
+  await page.locator('#paginationControls [data-page="next"]').click();
+  await expect(page.locator('#paginationInfo')).toHaveText('Showing 21–40 of 500');
+  await page.locator('#tableSearchInput').fill('API fixture 500');
+  await expect(page.locator('#resultsBody tr')).toHaveCount(1);
+  await expect(page.locator('#resultsBody .cid-cell')).toHaveText('500');
+  await page.locator('#downloadBtn').click();
+  await expect.poll(() => page.evaluate(() => window.__exports.length)).toBe(1);
+  const exported = await page.evaluate(() => window.__exports[0].book.sheet.rows);
+  expect(exported).toHaveLength(500);
+  expect(exported[499]['PubChem CID']).toBe('500');
+  expect(errors).toEqual([]);
+});
+
+test('501 distinct molecules are rejected before any API request', async ({ page }) => {
+  let requests = 0;
+  const errors = await openLookup(page, route => { requests++; return noMatch(route); });
+  const inputs = Array.from({ length: 501 }, (_, i) => String(i + 1));
+  await run(page, inputs);
+  await expect(page.locator('#countBadge')).toHaveText('501 / 500');
+  await expect(page.locator('#countBadge')).toHaveClass(/over/);
+  await expect(page.locator('#stateBox')).toBeVisible();
+  await expect(page.locator('#stateText')).toHaveText('Trim the list to 500 or fewer entries.');
+  await expect(page.locator('#cidInput')).toHaveValue(inputs.join('\n'));
+  expect(requests).toBe(0);
+  await expect(page.locator('#resultsBody tr')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('file imports accept 500 entries and clearly report truncation above the limit', async ({ page }) => {
+  let requests = 0;
+  const errors = await openLookup(page, route => { requests++; return noMatch(route); });
+  // Stub only the third-party sheet parser. Exercise the real FileReader/import UI.
+  await page.evaluate(() => {
+    XLSX.read = bytes => ({
+      SheetNames: ['Sheet1'],
+      Sheets: { Sheet1: new TextDecoder().decode(bytes).trim().split(/\r?\n/).map(value => [value]) }
+    });
+    XLSX.utils.sheet_to_json = sheet => sheet;
+  });
+  const inputs = Array.from({ length: 500 }, (_, i) => String(i + 1));
+  for (const size of [500, 501]) {
+    const rows = Array.from({ length: size }, (_, i) => String(i + 1));
+    await page.locator('#fileInput').setInputFiles({
+      name: `molecules-${size}.csv`, mimeType: 'text/csv',
+      buffer: Buffer.from(['CID', ...rows].join('\n'))
+    });
+    await expect(page.locator('#cidInput')).toHaveValue(inputs.join('\n'));
+    await expect(page.locator('#countBadge')).toHaveText('500 / 500');
+    if (size === 501) {
+      await expect(page.locator('.toast').filter({ hasText: 'Loaded the first 500 of 501 entries' })).toBeVisible();
+      await expect(page.locator('.toast').filter({ hasText: 'Import the remaining 1 in another batch' })).toBeVisible();
+    }
+  }
+  expect(requests).toBe(0);
+  expect(errors).toEqual([]);
+});

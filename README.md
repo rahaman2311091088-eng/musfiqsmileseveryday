@@ -12,7 +12,9 @@ The batch lookup in `index.html` uses `assets/pubchem-lookup.js`. **Deploy the `
 
 ### Inputs
 
-Enter up to 50 identifiers, one per line. Commas inside chemical names are preserved.
+Enter up to 500 identifiers, one per line, or import them from Excel/CSV. Commas inside chemical names are preserved. Files with more than 500 entries load the first 500 and show a notice to import the remainder in another batch.
+
+This is one batch of up to 500 molecules, not 500 simultaneous API requests. Large name-based batches may take several minutes because request pacing and automatic retries remain enabled. Keep the tab open until processing finishes.
 
 - A compound name, such as `Methyl ferulate`.
 - A numeric CID, `CID: 2244`, or `PubChem CID 2244`.
