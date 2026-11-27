@@ -9,6 +9,7 @@
   "devDependencies": {
     "@axe-core/playwright": "4.14.1",
     "@playwright/test": "1.65.1",
+    "jszip": "3.10.1",
     "miniflare": "5.20261123.1-beta"
   }
 }
