@@ -607,3 +607,93 @@ test('compact ADMET stays accessible and responsive with imports, received value
   expect(result.violations.map(v => ({ rule: v.id, nodes: v.nodes.map(n => n.target) }))).toEqual([]);
   expect(errors).toEqual([]);
 });
+
+// Run the real adapter behind the browser route, with synthetic outbound
+// authentication/provider responses. This never calls the live provider.
+async function adapterBridge(provider) {
+  const { createHandler } = await import('../../server/protox-handler.mjs');
+  const calls = [];
+  const handle = createHandler({ fetch: async (url, options) => {
+    calls.push({ url, options });
+    if (url.endsWith('/auth/v1/user')) return new Response(JSON.stringify({ id: 'fixture-user' }));
+    return provider(url, options);
+  } });
+  const onApi = async route => {
+    const incoming = route.request();
+    const action = new URL(incoming.url()).pathname.split('/').pop();
+    const res = await handle(new Request(incoming.url(), { method: incoming.method(), headers: incoming.headers(), body: incoming.postData() }), action);
+    return route.fulfill({ status: res.status, contentType: 'application/json', body: await res.text() });
+  };
+  return { calls, onApi };
+}
+
+test('submission HTML shows stage/status while resolved identities stay prediction-free, without automatic retry', async ({ page }) => {
+  const { calls, onApi } = await adapterBridge(() => new Response('<html>private upstream fixture</html>', { headers: { 'Content-Type': 'text/html' } }));
+  const { errors } = await open(page, { api: true, onApi });
+  await page.clock.install();
+  await page.locator('#admetIdentityType').selectOption('cid');
+  await page.locator('#admetIdentityInput').fill('2244');
+  await page.locator('#admetApiConsent').check();
+  await page.locator('#admetAutoRun').click();
+  await expect(page.locator('#admetSourceMessage')).toContainText('ProTox submission (HTTP 200)');
+  await expect(page.locator('#admetSourceMessage')).toContainText('instead of a job ID');
+  await expect(page.locator('#admetSourceMessage')).not.toContainText('private upstream fixture');
+  await expect(page.locator('#admetQueueLabel')).toContainText('Paused · 0/1');
+  const [p] = await profiles(page);
+  expect(p.identity.cid).toBe('2244');
+  expect(p.values).toEqual({});
+  expect(p.protoxJob).toBeUndefined();
+  await page.clock.fastForward(60000);
+  expect(calls.filter(call => call.url.endsWith('api_enqueue.php'))).toHaveLength(1);
+  expect(errors).toEqual([]);
+});
+
+for (const file of ['index.html', 'admet.html']) {
+  test(`${file}: adapter HTML polling stays pending, file errors retain jobs, reload resumes without re-enqueue`, async ({ page }) => {
+    let polls = 0, fileError = true;
+    const jobId = 'html-control-fixture';
+    const { calls, onApi } = await adapterBridge(url => {
+      if (url.endsWith('api_enqueue.php')) return new Response(jobId, { headers: { 'Retry-After': '5', 'Content-Type': 'text/html' } });
+      if (url.endsWith('api_retrieve.php')) return ++polls === 1
+        ? new Response('<!DOCTYPE html><html>Not ready</html>', { status: 404, headers: { 'Retry-After': '45' } })
+        : new Response('<html>CONTROL ONLY; never prediction evidence</html>');
+      if (fileError) return new Response('<html>private upstream fixture</html>');
+      const source = ready(jobId).files.find(source => source.url === url);
+      expect(source).toBeDefined();
+      return new Response(source.text, { headers: { 'Content-Type': 'text/html' } });
+    });
+    const { errors } = await open(page, { file, api: true, onApi });
+    await page.clock.install();
+    await page.locator('#admetIdentityInput').fill(smiles);
+    await page.locator('#admetApiConsent').check();
+    await page.locator('#admetAutoRun').click();
+    await expect(page.locator('#admetSourceMessage')).toContainText('waiting 30s');
+    await page.clock.fastForward(30000);
+    await expect(page.locator('#admetSourceMessage')).toContainText('waiting 45s (check 2/20)');
+    expect((await profiles(page))[0].values).toEqual({});
+    expect(calls.filter(call => call.url.includes('/csv/'))).toHaveLength(0);
+    await page.clock.fastForward(45000);
+    await expect(page.locator('#admetSourceMessage')).toContainText('ProTox result file (HTTP 200)');
+    await expect(page.locator('#admetSourceMessage')).toContainText('instead of CSV');
+    await expect(page.locator('#admetQueueLabel')).toContainText('Paused · 0/1');
+    expect((await profiles(page))[0]).toMatchObject({ values: {}, protoxJob: { id: jobId, inputSmiles: smiles, status: 'pending' } });
+    fileError = false;
+    await page.reload();
+    if (file === 'index.html') await page.evaluate(() => { showApp({ id: 'fixture-user', email: 'admet-test@example.test' }); setActivePanel('admetTab'); });
+    await expect(page.locator('#admetAutoRun')).toHaveText('Profile pending (1) ↗');
+    await page.locator('#admetApiConsent').check();
+    await page.locator('#admetAutoRun').click();
+    await expect(page.locator('#admetSourceMessage')).toContainText('waiting 30s');
+    await page.clock.fastForward(30000);
+    await expect(page.locator('#admetSourceMessage')).toContainText('1 source profile(s) received');
+    const [p] = await profiles(page);
+    expect(p.protoxJob.status).toBe('complete');
+    expect(p.values.ld50.value).toBe('7000');
+    expect(p.values.hepato.probability.value).toBe('0.00');
+    expect(p.imports).toHaveLength(3);
+    expect(JSON.stringify(p.imports)).not.toMatch(/CONTROL ONLY|private upstream fixture|<html>/);
+    expect(calls.filter(call => call.url.endsWith('api_enqueue.php'))).toHaveLength(1);
+    expect(calls.filter(call => call.url.endsWith('api_retrieve.php'))).toHaveLength(3);
+    expect(errors).toEqual([]);
+  });
+}

@@ -225,3 +225,105 @@ test('header-only provider CSV is explicitly missing, not inactive or a complete
   assert.equal(data.files.length, 1);
   assert.deepEqual(data.missing, ['acute toxicity', 'toxicity target']);
 });
+
+// Provider transport fixtures only, not observed or scientifically verified results.
+test('an HTML 404 on the result-check endpoint is pending and respects Retry-After', async () => {
+  const { handle, calls } = await server(() => reply('<!DOCTYPE html><html><body>Not found</body></html>', 404, { 'Content-Type': 'text/html', 'Retry-After': '75' }));
+  const res = await handle(request('retrieve', { jobId: 'pending-fixture' }), 'retrieve');
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { state: 'pending', jobId: 'pending-fixture', retryAfter: 75 });
+  assert.equal(calls.length, 2); // Auth and status only; no resubmission or premature file reads.
+});
+
+test('HTML at submission is never a job ID, and missing endpoints are not mistaken for pending jobs', async () => {
+  for (const status of [200, 404]) {
+    const { handle, calls } = await server(() => reply('<!DOCTYPE html><html>private echoed input; fixture-token</html>', status, { 'Content-Type': 'text/html' }));
+    const res = await handle(request('enqueue', { smiles: 'CCO' }), 'enqueue');
+    const body = await res.json();
+    assert.equal(res.status, 502);
+    assert(body.error.includes(`ProTox submission (HTTP ${status})`));
+    assert.match(body.error, status === 404 ? /endpoint was not found/ : /web\/error page instead of a job ID/);
+    assert.deepEqual(body.diagnostics, { adapterVersion: '2026-11-27.2', stage: 'enqueue', upstreamStatus: status });
+    assert.doesNotMatch(JSON.stringify(body), /private echoed input|fixture-token|<!DOCTYPE/);
+    assert.equal(body.jobId, undefined);
+    assert.equal(calls.length, 2);
+  }
+});
+
+test('non-empty HTML readiness bodies are not evidence; only fixed job CSVs supply returned values', async () => {
+  const panel = '<!DOCTYPE html><html>CONTROL RESPONSE, NOT A PREDICTION' + 'x'.repeat(65000) + '</html>';
+  const { handle, calls } = await server(url => {
+    if (url.endsWith('api_retrieve.php')) return reply(panel, 200, { 'Content-Type': 'text/html', 'Content-Length': String(panel.length) });
+    return reply('Target\tPrediction\tProbability\n' + (url.endsWith('_tox_class.csv') ? 'LD50\t7000\t88.40' : url.endsWith('_result.csv') ? 'dili\t0\t0.00' : 'Fixture target\t3\t0.60'), 200, { 'Content-Type': 'text/html' });
+  });
+  const res = await handle(request('retrieve', { jobId: 'ready-fixture' }), 'retrieve');
+  const body = await res.json();
+  assert.equal(res.status, 200, body.error);
+  assert.equal(body.state, 'ready');
+  assert.equal(body.files.length, 3);
+  assert(body.files.every(file => file.url.startsWith(ROOT + 'csv/ready-fixture_')));
+  assert(body.files[1].text.includes('dili\t0\t0.00'));
+  assert.doesNotMatch(JSON.stringify(body), /CONTROL RESPONSE|<html>/);
+  assert.equal(calls.length, 5);
+});
+
+test('HTML 404 result files stay missing, while HTML 200 result files fail closed with stage/status diagnostics', async () => {
+  let missingStatus = 404;
+  const { handle, calls } = await server(url => url.endsWith('api_retrieve.php') ? reply('<html>ready marker</html>')
+    : url.endsWith('_result.csv') ? reply('Target\tPrediction\tProbability\ndili\t0\t0.00')
+    : reply('<html>Not found</html>', missingStatus, { 'Content-Type': 'text/html' }));
+  let res = await handle(request('retrieve', { jobId: 'partial-fixture' }), 'retrieve');
+  let body = await res.json();
+  assert.equal(body.state, 'ready');
+  assert.equal(body.files.length, 1);
+  assert.deepEqual(body.missing, ['acute toxicity', 'toxicity target']);
+  assert.equal(calls.length, 5);
+  missingStatus = 200;
+  res = await handle(request('retrieve', { jobId: 'partial-fixture' }), 'retrieve');
+  body = await res.json();
+  assert.equal(res.status, 502);
+  assert.match(body.error, /ProTox result file \(HTTP 200\).*web\/error page instead of CSV/);
+  assert.equal(body.files, undefined);
+  assert.deepEqual(body.diagnostics, { adapterVersion: '2026-11-27.2', stage: 'file', upstreamStatus: 200 });
+});
+
+test('a readiness hint with no available CSVs stays pending; empty and excessive-whitespace bodies never create values', async () => {
+  for (const content of ['<html>ready hint</html>', '', '   \n\t', ' '.repeat(16001)]) {
+    const { handle, calls } = await server(url => url.endsWith('api_retrieve.php') ? reply(content) : reply('<html>Not found</html>', 404));
+    const res = await handle(request('retrieve', { jobId: 'unready-fixture' }), 'retrieve');
+    const body = await res.json();
+    assert.equal(body.files, undefined);
+    if (content.length > 16000) {
+      assert.equal(res.status, 502);
+      assert.equal(body.diagnostics.stage, 'retrieve');
+      assert.match(body.error, /ProTox result check \(HTTP 200\).*excessive empty content/);
+    } else {
+      assert.equal(res.status, 200);
+      assert.equal(body.state, 'pending');
+      assert.equal(body.jobId, 'unready-fixture');
+    }
+    assert.equal(calls.length, content.startsWith('<html>') ? 5 : 2);
+  }
+});
+
+test('browser client and adapter progress from HTML pending to original CSVs without another enqueue', async () => {
+  let polls = 0;
+  const { handle, calls } = await server(url => {
+    if (url.endsWith('api_enqueue.php')) return reply('end-to-end-fixture', 200, { 'Content-Type': 'text/html' });
+    if (url.endsWith('api_retrieve.php')) return ++polls === 1 ? reply('<html>Not found</html>', 404, { 'Retry-After': '60' }) : reply('<html>ready marker</html>');
+    return reply('Target\tPrediction\tProbability\n' + (url.endsWith('_tox_class.csv') ? 'LD50\t7000\t88.40' : url.endsWith('_result.csv') ? 'dili\t0\t0.00' : 'Fixture target\t3\t0.60'));
+  });
+  const waits = [];
+  const client = createClient({ getToken: async () => 'fixture-token', wait: async ms => waits.push(ms), fetch: async (url, options) => {
+    const action = url.split('/').pop();
+    return handle(new Request('https://preview.example' + url, options), action);
+  } });
+  const job = await client.enqueue('C[C@@H](O)C(=O)O');
+  const result = await client.poll(job, { maxPolls: 3 });
+  assert.equal(job.inputSmiles, 'C[C@@H](O)C(=O)O');
+  assert.equal(result.state, 'ready');
+  assert.equal(result.files.length, 3);
+  assert.deepEqual(waits, [30000, 60000]);
+  assert.equal(calls.filter(call => call.url.endsWith('api_enqueue.php')).length, 1);
+  assert.equal(calls.filter(call => call.url.endsWith('api_retrieve.php')).length, 2);
+});

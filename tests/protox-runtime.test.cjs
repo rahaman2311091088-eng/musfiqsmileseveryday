@@ -39,7 +39,7 @@ test('Workers status identifies the deployed adapter revision without requesting
   const res = await mf.dispatchFetch('https://example.test/api/protox/status');
   const body = await res.json();
   assert.equal(res.status, 200);
-  assert.equal(body.adapterVersion, '2026-11-27.1');
+  assert.equal(body.adapterVersion, '2026-11-27.2');
   assert.match(body.note, /upstream health.*not implied/);
   assert.equal(calls.length, 0);
 });
@@ -101,4 +101,52 @@ test('Workers runtime distinguishes sign-in service outages from expired session
   assert.equal(session.status, 401);
   assert.match((await session.json()).error, /Sign in again/);
   assert.deepEqual(calls.map(call => call.url), [AUTH, AUTH]);
+});
+
+test('Workers treats a 404 HTML status response as pending without fetching source files or resubmitting', async t => {
+  const { mf, calls } = await runtime(t, url => url === AUTH ? response({ id: 'fixture-user' }) : response('<!DOCTYPE html><html>Not found</html>', 404, { 'Retry-After': '60', 'Content-Type': 'text/html' }));
+  const res = await predict(mf, 'retrieve', { jobId: 'runtime-pending' });
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { state: 'pending', jobId: 'runtime-pending', retryAfter: 60 });
+  assert.deepEqual(calls.map(call => call.url), [AUTH, ROOT + 'src/api_retrieve.php']);
+});
+
+test('Workers accepts HTML only as a readiness hint and preserves actual CSV values even with PHP media types', async t => {
+  const { mf, calls } = await runtime(t, url => {
+    if (url === AUTH) return response({ id: 'fixture-user' });
+    if (url.endsWith('api_retrieve.php')) return response('<!DOCTYPE html><html>CONTROL ONLY</html>', 200, { 'Content-Type': 'text/html' });
+    return response('Target\tPrediction\tProbability\n' + (url.endsWith('_tox_class.csv') ? 'LD50\t7000\t88.40' : url.endsWith('_result.csv') ? 'dili\t0\t0.00' : 'Fixture target\t3\t0.60'), 200, { 'Content-Type': 'text/html' });
+  });
+  const res = await predict(mf, 'retrieve', { jobId: 'runtime-ready' });
+  const body = await res.json();
+  assert.equal(res.status, 200, body.error);
+  assert.equal(body.state, 'ready');
+  assert.equal(body.files.length, 3);
+  assert(body.files[1].text.includes('dili\t0\t0.00'));
+  assert.doesNotMatch(JSON.stringify(body), /CONTROL ONLY|<html>/);
+  assert.equal(calls.length, 5);
+});
+
+test('Workers retains partial output when missing CSV files have HTML 404 bodies', async t => {
+  const { mf } = await runtime(t, url => url === AUTH ? response({ id: 'fixture-user' }) : url.endsWith('api_retrieve.php') ? response('ready')
+    : url.endsWith('_result.csv') ? response('Target\tPrediction\tProbability\ndili\t0\t0.00') : response('<html>Missing file</html>', 404));
+  const body = await (await predict(mf, 'retrieve', { jobId: 'runtime-partial' })).json();
+  assert.equal(body.state, 'ready');
+  assert.equal(body.files.length, 1);
+  assert.deepEqual(body.missing, ['acute toxicity', 'toxicity target']);
+});
+
+test('Workers submission HTML errors identify HTTP status and never become job IDs or duplicate submissions', async t => {
+  let status = 404;
+  const { mf, calls } = await runtime(t, url => url === AUTH ? response({ id: 'fixture-user' }) : response('<html>Private upstream text</html>', status, { 'Content-Type': 'text/html' }));
+  for (status of [404, 200]) {
+    const res = await predict(mf, 'enqueue', { smiles: 'CCO' });
+    const body = await res.json();
+    assert.equal(res.status, 502);
+    assert(body.error.includes(`ProTox submission (HTTP ${status})`));
+    assert.deepEqual(body.diagnostics, { adapterVersion: '2026-11-27.2', stage: 'enqueue', upstreamStatus: status });
+    assert.equal(body.jobId, undefined);
+    assert.doesNotMatch(JSON.stringify(body), /Private upstream text|runtime-fixture|<html>/);
+  }
+  assert.deepEqual(calls.map(call => call.url), [AUTH, ROOT + 'src/api_enqueue.php', AUTH, ROOT + 'src/api_enqueue.php']);
 });
