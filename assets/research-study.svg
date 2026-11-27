@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 560" fill="none">
+  <title>Research study — an abstract molecular line drawing, not a prediction</title>
+  <defs><pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M28 0H0v28" stroke="#DAD6CB" stroke-width=".5"/></pattern></defs>
+  <rect x="30" y="30" width="540" height="500" fill="url(#grid)"/>
+  <circle cx="300" cy="280" r="196" stroke="#C9C5BB" stroke-width="1"/>
+  <circle cx="300" cy="280" r="152" stroke="#C9C5BB" stroke-width="1" stroke-dasharray="2 6"/>
+  <path d="M300 56v448M76 280h448" stroke="#C9C5BB" stroke-width="1"/>
+  <g stroke="#242F32" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m245 215 65-37 65 37v75l-65 37-65-37v-75Z"/>
+    <path d="m256 223 54-31m52 31v59m-52 31-53-31"/>
+    <path d="m375 215 52-30m-182 30-45-26m45 101-55 32m120 5v58"/>
+    <path d="m427 185 42 24m-42-24v-53m-9 47v-47m-228 190-45-26m45 26v53"/>
+    <path d="m310 385-47 28m47-28 50 29m-46-36 50 29"/>
+  </g>
+  <g fill="#F5F2E9" stroke="#B5442D" stroke-width="2"><circle cx="191" cy="184" r="11"/><circle cx="310" cy="398" r="10"/><circle cx="477" cy="214" r="10"/><circle cx="427" cy="121" r="10"/></g>
+  <g stroke="#B5442D" stroke-width="1"><path d="m65 89 20 0m-10-10v20M510 449h20m-10-10v20"/><path d="m468 340 48 28v50" stroke-dasharray="3 4"/><path d="m170 137-49-20H75" stroke-dasharray="3 4"/></g>
+  <g fill="#242F32"><circle cx="245" cy="215" r="4"/><circle cx="245" cy="290" r="4"/><circle cx="375" cy="290" r="4"/></g>
+  <g fill="#B5442D"><circle cx="468" cy="340" r="4"/><rect x="297" y="81" width="6" height="6"/></g>
+</svg>
