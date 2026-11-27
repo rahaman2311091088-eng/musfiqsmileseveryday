@@ -244,7 +244,7 @@ test('ProTox API persists jobs, uses exact input, and attaches source results to
   } });
   await page.clock.install();
   await add(page, smiles + '\nCCN', '');
-  await expect(page.locator('#admetApiStatus')).toContainText('adapter available');
+  await expect(page.locator('#admetApiStatus')).toContainText('provider availability not verified');
   await expect(page.locator('#admetRunProtox')).toBeDisabled();
   await page.locator('#admetApiConsent').check();
   await expand(page, 'admetQueueOptions');
@@ -697,3 +697,124 @@ for (const file of ['index.html', 'admet.html']) {
     expect(errors).toEqual([]);
   });
 }
+
+for (const file of ['index.html', 'admet.html']) {
+  test(`${file}: a submission 404 reports failed availability and offers manual source import without retries or data loss`, async ({ page }) => {
+    const { calls, onApi } = await adapterBridge(() => new Response('<html>Endpoint not found</html>', { status: 404 }));
+    const { errors, external } = await open(page, { file, api: true, onApi });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.clock.install();
+    await expect(page.locator('#admetApiStatus')).toContainText('provider availability not verified');
+    await expect(page.locator('#admetProviderRecovery')).toBeHidden();
+    await page.locator('#admetIdentityInput').fill(smiles + '\nCCO');
+    await page.locator('#admetApiConsent').check();
+    await page.locator('#admetAutoRun').click();
+    await expect(page.locator('#admetSourceMessage')).toContainText('ProTox submission (HTTP 404)');
+    await expect(page.locator('#admetApiStatus')).toHaveText('Last ProTox submission failed · HTTP 404.');
+    await expect(page.locator('#admetApiStatus')).toHaveAttribute('data-error', 'true');
+    await expect(page.locator('#admetQueueLabel')).toContainText('Paused · 0/2');
+    await expect(page.locator('#admetProviderRecovery')).toBeVisible();
+    await expect(page.locator('#admetProviderRecovery a').first()).toHaveAttribute('href', 'https://tox.charite.de/protox3/');
+    await expect(page.locator('#admetProviderRecovery a').last()).toHaveAttribute('href', 'https://tox.charite.de/protox3/index.php?site=contact');
+    expect((await profiles(page)).every(p => !p.protoxJob && !Object.keys(p.values).length)).toBe(true);
+    await page.clock.fastForward(120000);
+    expect(calls.filter(call => call.url.endsWith('api_enqueue.php'))).toHaveLength(1);
+    expect(calls.filter(call => call.url.endsWith('api_retrieve.php'))).toHaveLength(0);
+
+    await page.locator('#admetOpenProviderImport').click();
+    await expect(page.locator('#admetImportSection')).toHaveAttribute('open', '');
+    await expect(page.locator('#admetImportProvider')).toHaveValue('protox');
+    await expect(page.locator('#admetImportProvider')).toBeFocused();
+    await expect(page.locator('#admetIdentityConfirm')).not.toBeChecked();
+    // Reopening recovery cannot change or erase an in-progress Swiss export.
+    await page.locator('#admetImportProvider').selectOption('swissadme');
+    await page.locator('#admetSourceText').fill(swiss);
+    await page.locator('#admetSourceFile').setInputFiles({ name: 'swiss-draft.csv', mimeType: 'text/csv', buffer: Buffer.from(swiss) });
+    await page.locator('#admetIdentityConfirm').check();
+    await page.locator('#admetImportSection > summary').click();
+    await page.locator('#admetOpenProviderImport').click();
+    await expect(page.locator('#admetImportProvider')).toHaveValue('swissadme');
+    await expect(page.locator('#admetSourceText')).toHaveValue(swiss);
+    expect(await page.locator('#admetSourceFile').evaluate(el => el.files[0].name)).toBe('swiss-draft.csv');
+    await expect(page.locator('#admetIdentityConfirm')).toBeChecked();
+
+    for (const width of [320, 390, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    }
+    if (file === 'admet.html') {
+      const AxeBuilder = require('@axe-core/playwright').default;
+      const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+      expect(result.violations.map(v => ({ rule: v.id, nodes: v.nodes.map(n => n.target) }))).toEqual([]);
+    }
+    // The fallback accepts actual source output only, not a local substitute.
+    await page.locator('#admetClearSource').click();
+    await page.locator('#admetImportProvider').selectOption('protox');
+    await page.locator('#admetSourceText').fill(protox);
+    await page.locator('#admetIdentityConfirm').check();
+    await page.locator('#admetImportResults').click();
+    await expect(page.locator('#admetSourceMessage')).toContainText('Imported 1 ProTox 3.0');
+    const result = await profiles(page);
+    expect(result).toHaveLength(2);
+    expect(result[0].values.ld50.value).toBe('7000');
+    expect(result[0].values.hepato.probability.value).toBe('0.00');
+    expect(result[0].imports[0].method).toBe('paste');
+    expect(result[1].values).toEqual({});
+    expect(result.every(p => !p.protoxJob)).toBe(true);
+    await expect(page.locator('#admetApiStatus')).toHaveText('Last ProTox submission failed · HTTP 404.');
+    await expect(page.locator('#admetProviderRecovery')).toBeHidden();
+    expect(calls.filter(call => call.url.endsWith('api_enqueue.php'))).toHaveLength(1);
+    expect(external.filter(url => /tox\.charite\.de|swissadme\.ch/.test(url))).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+}
+
+test('a saved-job result cannot clear a submission failure; only an explicitly requested successful submission can', async ({ page }) => {
+  let rejectSubmission = false, enqueues = 0;
+  const { calls, onApi } = await adapterBridge(url => {
+    if (url.endsWith('api_enqueue.php')) {
+      enqueues++;
+      return rejectSubmission ? new Response('Not found', { status: 404 }) : new Response('availability-fixture-' + enqueues, { headers: { 'Retry-After': '5' } });
+    }
+    if (url.endsWith('api_retrieve.php')) return new Response('ready');
+    const job = url.includes('availability-fixture-1_') ? 'availability-fixture-1' : 'availability-fixture-3';
+    const source = ready(job).files.find(source => source.url === url);
+    expect(source).toBeDefined();
+    return new Response(source.text);
+  });
+  const { errors } = await open(page, { api: true, onApi });
+  await page.clock.install();
+  await page.locator('#admetIdentityInput').fill(smiles);
+  await page.locator('#admetApiConsent').check();
+  await page.locator('#admetAutoRun').click();
+  await expect(page.locator('#admetSourceMessage')).toContainText('waiting 30s');
+  await page.locator('#admetStopProtox').click();
+  await expect(page.locator('#admetSourceMessage')).toContainText('Queue stopped');
+  rejectSubmission = true;
+  await page.locator('#admetIdentityInput').fill('CCO');
+  await page.locator('#admetAutoRun').click();
+  await expect(page.locator('#admetApiStatus')).toHaveText('Last ProTox submission failed · HTTP 404.');
+
+  await page.locator('[data-review]').first().click();
+  await expand(page, 'admetQueueOptions');
+  await page.locator('#admetRunProtox').click();
+  await expect(page.locator('#admetSourceMessage')).toContainText('waiting 30s');
+  await page.clock.fastForward(30000);
+  await expect(page.locator('#admetSourceMessage')).toContainText('1 source profile(s) received');
+  await expect(page.locator('#admetApiStatus')).toHaveText('Last ProTox submission failed · HTTP 404.');
+  expect(calls.filter(call => call.url.endsWith('api_enqueue.php'))).toHaveLength(2);
+
+  // Explicit user retry against a now-successful fixture; never an automatic retry.
+  rejectSubmission = false;
+  await page.locator('#admetAutoRun').click();
+  await expect(page.locator('#admetSourceMessage')).toContainText('waiting 30s');
+  await expect(page.locator('#admetApiStatus')).toHaveText('Last ProTox submission accepted.');
+  await expect(page.locator('#admetApiStatus')).toHaveAttribute('data-error', 'false');
+  await page.clock.fastForward(30000);
+  await expect(page.locator('#admetSourceMessage')).toContainText('1 source profile(s) received');
+  await expect(page.locator('#admetApiStatus')).not.toContainText('failed');
+  expect(calls.filter(call => call.url.endsWith('api_enqueue.php'))).toHaveLength(3);
+  expect(calls.filter(call => call.url.endsWith('api_retrieve.php'))).toHaveLength(2);
+  expect((await profiles(page)).every(p => p.protoxJob.status === 'complete')).toBe(true);
+  expect(errors).toEqual([]);
+});

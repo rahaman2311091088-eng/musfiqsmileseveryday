@@ -43,6 +43,14 @@
           const error = new Error(result.error || `ProTox request failed (${response.status}).`);
           error.status = response.status;
           error.retryAfter = secondsOf(result.retryAfter, 30);
+          // Keep only the adapter's bounded, non-sensitive transport metadata.
+          // The UI must not infer provider health from the local HTTP 502 alone.
+          const details = result.diagnostics;
+          if (details && !Array.isArray(details) && ['enqueue', 'retrieve', 'file'].includes(details.stage)
+              && (details.upstreamStatus === null || (Number.isInteger(details.upstreamStatus) && details.upstreamStatus >= 100 && details.upstreamStatus <= 599))) {
+            error.diagnostics = { stage: details.stage, upstreamStatus: details.upstreamStatus };
+            if (/^\d{4}-\d{2}-\d{2}\.\d{1,6}$/.test(details.adapterVersion || '')) error.diagnostics.adapterVersion = details.adapterVersion;
+          }
           if (response.status === 429 || result.retryAfter) cooldownUntil = now() + error.retryAfter * 1000;
           throw error;
         }

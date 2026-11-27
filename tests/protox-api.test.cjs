@@ -327,3 +327,28 @@ test('browser client and adapter progress from HTML pending to original CSVs wit
   assert.equal(calls.filter(call => call.url.endsWith('api_enqueue.php')).length, 1);
   assert.equal(calls.filter(call => call.url.endsWith('api_retrieve.php')).length, 2);
 });
+
+test('browser errors preserve only validated provider stage/status metadata without copying private extras', async () => {
+  for (const [details, expected] of [
+    [{ stage: 'enqueue', upstreamStatus: 404, adapterVersion: '2026-11-27.2', raw: 'private fixture', authorization: 'fixture-token' }, { stage: 'enqueue', upstreamStatus: 404, adapterVersion: '2026-11-27.2' }],
+    [{ stage: 'retrieve', upstreamStatus: null }, { stage: 'retrieve', upstreamStatus: null }],
+    [{ stage: 'file', upstreamStatus: 200, adapterVersion: '<html>bad</html>' }, { stage: 'file', upstreamStatus: 200 }],
+    [{ stage: '<script>', upstreamStatus: 404 }, undefined],
+    [{ stage: 'enqueue', upstreamStatus: '404' }, undefined],
+    [{ stage: 'enqueue', upstreamStatus: 600 }, undefined],
+    [[], undefined],
+    [null, undefined]
+  ]) {
+    let calls = 0;
+    const client = createClient({ getToken: async () => 'fixture-token', fetch: async () => {
+      calls++; return reply({ error: 'Provider request failed', diagnostics: details }, 502);
+    } });
+    await assert.rejects(client.enqueue('CCO'), error => {
+      assert.equal(error.status, 502);
+      assert.deepEqual(error.diagnostics, expected);
+      assert.doesNotMatch(JSON.stringify(error.diagnostics || {}), /private fixture|fixture-token|<html>/);
+      return true;
+    });
+    assert.equal(calls, 1);
+  }
+});

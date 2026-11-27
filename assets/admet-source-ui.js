@@ -12,6 +12,7 @@
   let loaded = S.loadStored(storageGet(S.STORAGE_KEY));
   let profiles = loaded.profiles, selectedId = profiles[0]?.id || '', importTargetId = '';
   let busy = false, apiAvailable = false, queueController = null, legacySession = null;
+  let lastProviderFailure = null;
   const legacy = storageGet('ddu_admet_compounds');
   root.classList.add('admet-source-app');
   root.innerHTML = `
@@ -31,6 +32,7 @@
       <div id="admetQueueProgress" class="admet-queue-progress" hidden><div id="admetQueueLabel" class="source-muted"></div><progress id="admetQueueMeter" max="1" value="0" aria-label="Profiling progress"></progress></div>
     </section>
     <div id="admetSourceMessage" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+    <div id="admetProviderRecovery" class="source-actions admet-provider-recovery" role="group" aria-label="Provider connection alternatives" hidden><button id="admetOpenProviderImport">Import provider export</button><a href="https://tox.charite.de/protox3/" target="_blank" rel="noopener noreferrer">Open ProTox ↗</a><a href="https://tox.charite.de/protox3/index.php?site=contact" target="_blank" rel="noopener noreferrer">Contact ProTox ↗</a></div>
 
     <section class="source-card" id="admetSourceDataset" aria-labelledby="admetResultsTitle">
       <div class="admet-results-heading"><h2 id="admetResultsTitle">Results</h2><div class="source-actions admet-exports"><button id="admetGenerateDocxBtn">Word report</button><button id="admetExportCsvBtn">CSV</button><button id="admetExportEvidence">Evidence JSON</button></div></div>
@@ -63,11 +65,38 @@
       <p>SwissADME: Daina et al. (2017), DOI 10.1038/srep42717. ProTox 3.0: Banerjee et al. (2024), DOI 10.1093/nar/gkae303.</p>
     </div></details>`;
 
-  function message(text, error = false) {
+  function message(text, error = false, providerRecovery = false) {
     $('admetSourceMessage').hidden = !text;
     $('admetSourceMessage').textContent = text;
     $('admetSourceMessage').dataset.error = String(error);
+    $('admetProviderRecovery').hidden = !providerRecovery;
   }
+  function providerFailed(details) {
+    lastProviderFailure = details;
+    const stage = { enqueue: 'submission', retrieve: 'result check', file: 'result download' }[details.stage];
+    $('admetApiStatus').textContent = `Last ProTox ${stage} failed · ${details.upstreamStatus === null ? 'no HTTP response' : `HTTP ${details.upstreamStatus}`}.`;
+    $('admetApiStatus').dataset.error = 'true';
+    $('admetApiStatus').title = 'The adapter exists, but this provider request failed. A submission 404 is not a pending job or a successful prediction.';
+  }
+  function providerRecovered(stage) {
+    // Retrieving an older job does not establish that new submissions work.
+    if (!lastProviderFailure || (lastProviderFailure.stage === 'enqueue') !== (stage === 'enqueue')) return;
+    lastProviderFailure = null;
+    $('admetApiStatus').textContent = stage === 'enqueue' ? 'Last ProTox submission accepted.' : 'Last ProTox result received · see source evidence below.';
+    $('admetApiStatus').dataset.error = 'false';
+    $('admetApiStatus').title = 'This describes the last response, not a guarantee of future provider availability or scientific accuracy.';
+  }
+  $('admetOpenProviderImport').addEventListener('click', () => {
+    if (busy) return;
+    // Never reinterpret or clear an in-progress SwissADME/file import.
+    if (!$('admetSourceText').value.trim() && !$('admetSourceFile').files.length) {
+      $('admetImportProvider').value = 'protox';
+      $('admetIdentityConfirm').checked = false;
+      $('admetReplaceSource').checked = false;
+    }
+    $('admetImportSection').open = true;
+    $('admetImportProvider').focus();
+  });
   function download(data, filename, type = 'text/plain;charset=utf-8') {
     const url = URL.createObjectURL(data instanceof Blob ? data : new Blob([data], { type }));
     const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
@@ -394,6 +423,7 @@
           try { localStorage.setItem('ddu_protox_usage', JSON.stringify({ day: stamp(), count: count + 1 })); } catch { /* The provider also enforces its shared-IP quota. */ }
           message(`Submitting ${nameOf(current)} · ${completed + 1}/${total}.`);
           job = await api.enqueue(current.identity.smiles, signal);
+          providerRecovered('enqueue');
           persist(profiles.map(p => p.id === current.id ? { ...p, protoxJob: job } : p));
         }
         if (job.inputSmiles !== current.identity.smiles) throw new Error('Saved API job does not match the current SMILES. Nothing was attached.');
@@ -410,6 +440,7 @@
         const missingTypes = ['acute toxicity', 'toxicity model', 'toxicity target'].filter(type => !result.files.some(file => file.type === type) || result.missing?.includes(type));
         merged.protoxJob = { ...job, status: missingTypes.length ? 'partial' : 'complete' };
         persist(profiles.map(p => p.id === current.id ? merged : p));
+        providerRecovered('retrieve');
         completed++;
         queueProgress(`ProTox · ${completed}/${total} responses received`, completed, total);
         if (missingTypes.length) {
@@ -421,7 +452,9 @@
     } catch (error) {
       const state = error.name === 'AbortError' ? 'Stopped' : 'Paused';
       queueProgress(total ? `${state} · ${completed}/${total} responses received` : `${state} before submission.`, completed, Math.max(1, total));
-      message(error.name === 'AbortError' ? 'Queue stopped. Saved jobs can be resumed; interrupted submissions are not automatically repeated.' : error.message, true);
+      const stopped = error.name === 'AbortError';
+      if (!stopped && error.diagnostics) providerFailed(error.diagnostics);
+      message(stopped ? 'Queue stopped. Saved jobs can be resumed; interrupted submissions are not automatically repeated.' : error.message, true, !stopped && Boolean(error.diagnostics));
     } finally { queueController = null; setBusy(false); render(); }
   }
   $('admetApiConsent').addEventListener('change', () => {
@@ -441,8 +474,8 @@
     if (!response.ok || !response.headers.get('Content-Type')?.includes('application/json')) throw new Error('unavailable');
     const data = await response.json(); apiAvailable = data.available === true && data.provider === 'ProTox 3.0';
     if (!apiAvailable) throw new Error('unavailable');
-    $('admetApiStatus').textContent = 'ProTox adapter available · API quota: 250 queries/day/source IP.';
-    $('admetApiStatus').title = 'Adapter availability is not upstream health. Provider availability and quota are checked when you run.';
+    $('admetApiStatus').textContent = 'ProTox connection configured · provider availability not verified.';
+    $('admetApiStatus').title = 'No provider health-check jobs are submitted. ProTox controls availability and its 250 queries/day/source-IP quota.';
     updateApiButtons();
   }).catch(() => {
     apiAvailable = false;
