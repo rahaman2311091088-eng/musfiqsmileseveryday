@@ -188,8 +188,8 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
         </a>
         <a class="tool-index-row" href="#authScreen" data-open-panel="admetTab" data-reveal>
           <span class="tool-number" aria-hidden="true">02</span>
-          <div class="tool-title"><small>Profile &amp; question</small><h3>ADMET evidence</h3></div>
-          <p class="tool-description">Bring SwissADME exports and ProTox predictions into source-linked records. Missing values stay missing. The original evidence stays attached.</p>
+          <div class="tool-title"><small>Profile &amp; question</small><h3>ADMET profiling</h3></div>
+          <p class="tool-description">Profile compounds with the ProTox API and import SwissADME exports. Source evidence stays attached; missing values stay missing.</p>
           <span class="tool-arrow" aria-hidden="true">↗</span>
         </a>
         <a class="tool-index-row" href="#authScreen" data-open-panel="dockingPanel" data-reveal>
@@ -287,7 +287,7 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
       <div class="sidebar-section-label">Your workspace</div>
       <button class="sidebar-item active" type="button" data-panel="dashboardPanel" aria-current="page"><span class="nav-number" aria-hidden="true">00</span>Workbench</button>
       <button class="sidebar-item" type="button" data-panel="pubchemTab"><span class="nav-number" aria-hidden="true">01</span>Compound lookup</button>
-      <button class="sidebar-item" type="button" data-panel="admetTab"><span class="nav-number" aria-hidden="true">02</span>ADMET evidence</button>
+      <button class="sidebar-item" type="button" data-panel="admetTab"><span class="nav-number" aria-hidden="true">02</span>ADMET profiling</button>
       <button class="sidebar-item" type="button" data-panel="dockingPanel"><span class="nav-number" aria-hidden="true">03</span>Docking results</button>
       <div class="sidebar-section-label">On your desk</div>
       <button class="sidebar-item" id="sidebarNewLookup" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New lookup</button>
@@ -322,7 +322,7 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
 
       <div class="dash-tools" aria-label="Research tools">
         <button class="dash-tool" type="button" id="dashNewLookup"><span class="tool-kicker">01 / IDENTIFY</span><h2>Compound lookup</h2><p>Names, CIDs, structures. Up to 500 entries in a single batch.</p><span class="tool-link">Start a lookup <b aria-hidden="true">↗</b></span></button>
-        <button class="dash-tool" type="button" id="dashNewAdmet"><span class="tool-kicker">02 / INVESTIGATE</span><h2>ADMET evidence</h2><p>SwissADME and ProTox records, with the source kept in view.</p><span class="tool-link">Open profiling <b aria-hidden="true">↗</b></span></button>
+        <button class="dash-tool" type="button" id="dashNewAdmet"><span class="tool-kicker">02 / INVESTIGATE</span><h2>ADMET profiling</h2><p>Automatic ProTox profiling and SwissADME imports, with source evidence.</p><span class="tool-link">Open profiling <b aria-hidden="true">↗</b></span></button>
         <button class="dash-tool" type="button" id="dashDocking"><span class="tool-kicker">03 / COMPARE</span><h2>Docking results</h2><p>Organize uploaded scores from up to 15 protein targets.</p><span class="tool-link">Review results <b aria-hidden="true">↗</b></span></button>
       </div>
 
@@ -868,7 +868,7 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
       else el.removeAttribute('aria-current');
     });
     document.querySelectorAll('.main-panel').forEach(p => p.classList.toggle('active', p === panel));
-    const labels = { dashboardPanel: 'WORKBENCH', pubchemTab: 'COMPOUND LOOKUP', admetTab: 'ADMET EVIDENCE', dockingPanel: 'DOCKING RESULTS' };
+    const labels = { dashboardPanel: 'WORKBENCH', pubchemTab: 'COMPOUND LOOKUP', admetTab: 'ADMET PROFILING', dockingPanel: 'DOCKING RESULTS' };
     document.getElementById('workspacePageName').textContent = labels[panelId];
     if (panelId === 'dashboardPanel') updateDashboardStats();
     if (changed && appScreen.classList.contains('active')) {
@@ -951,7 +951,7 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
 
   const cmdActions = [
     { label: 'New Compound Lookup', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>', action: () => { setActivePanel('pubchemTab'); cidInput?.focus(); } },
-    { label: 'ADMET: SwissADME imports / ProTox API', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>', action: () => { setActivePanel('admetTab'); document.getElementById('admetIdentityInput')?.focus(); } },
+    { label: 'ADMET profiling: automatic ProTox / SwissADME imports', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>', action: () => { setActivePanel('admetTab'); document.getElementById('admetIdentityInput')?.focus(); } },
     { label: 'Generate Word Report (.docx)', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>', action: () => { setActivePanel('admetTab'); document.getElementById('admetGenerateDocxBtn')?.scrollIntoView({ behavior: window.DduSite?.reducedMotion() ? 'auto' : 'smooth' }); } },
     { label: 'Load Sample Data', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>', action: () => { setActivePanel('pubchemTab'); document.getElementById('sampleBtn')?.click(); } },
     { label: 'Workbench', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>', action: () => setActivePanel('dashboardPanel') },

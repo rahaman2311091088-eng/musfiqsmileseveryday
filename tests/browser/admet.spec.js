@@ -8,7 +8,7 @@ const swiss = `Molecule,Canonical SMILES,MW,XLOGP3,WLOGP,Consensus Log P,GI abso
 const protox = `input\ttype\tTarget\tPrediction\tProbability\n${smiles}\tacute toxicity\tLD50\t7000\t88.40\n${smiles}\tacute toxicity\ttox_class\t6\t88.40\n${smiles}\ttoxicity model\tdili\t0\t0.00\n${smiles}\ttoxicity model\tbbb\t1\t0.73`;
 const json = (route, body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 
-async function open(page, { file = 'index.html', legacy = false, api = false, onApi, history = [] } = {}) {
+async function open(page, { file = 'index.html', legacy = false, api = false, onApi, onLookup, history = [] } = {}) {
   const errors = [], external = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.addInitScript(({ legacy, history }) => {
@@ -40,7 +40,8 @@ async function open(page, { file = 'index.html', legacy = false, api = false, on
   }, { legacy, history });
   await page.route('https://**/*', async route => {
     external.push(route.request().url());
-    if (route.request().url().includes('/rest/pug/')) {
+    if (/\/rest\/pug\/|\/entrez\/eutils\//.test(route.request().url())) {
+      if (onLookup) return onLookup(route);
       return json(route, { PropertyTable: { Properties: [{ CID: 2244, Title: 'PubChem identity fixture', SMILES: smiles, MolecularWeight: '999.99', MolecularFormula: 'Fixture' }] } });
     }
     return route.fulfill({ status: 200, contentType: 'application/javascript', body: '' });
@@ -54,17 +55,26 @@ async function open(page, { file = 'index.html', legacy = false, api = false, on
   await expect(page.locator('#admetAddIdentity')).toBeVisible();
   return { errors, external };
 }
+async function expand(page, id) {
+  const panel = page.locator('#' + id);
+  if (!await panel.evaluate(el => el.open)) await panel.locator(':scope > summary').click();
+}
 async function add(page, structure = smiles, label = 'Test compound') {
   await page.locator('#admetIdentityInput').fill(structure);
+  await expand(page, 'admetInputOptions');
   await page.locator('#admetIdentityLabel').fill(label);
   await page.locator('#admetAddIdentity').click();
   await expect(page.locator('#admetSourceMessage')).toContainText('Added');
 }
 async function paste(page, provider, text, { replace = false } = {}) {
+  await expand(page, 'admetImportSection');
   await page.locator('#admetImportProvider').selectOption(provider);
   await page.locator('#admetSourceText').fill(text);
   await page.locator('#admetIdentityConfirm').check();
-  if (replace) await page.locator('#admetReplaceSource').check();
+  if (replace) {
+    await expand(page, 'admetImportOptions');
+    await page.locator('#admetReplaceSource').check();
+  }
   await page.locator('#admetImportResults').click();
 }
 const profiles = page => page.evaluate(() => DduAdmetApp.getProfiles());
@@ -103,6 +113,7 @@ test('legacy local and cloud records are quarantined; dashboards never interpret
   await expect(page.locator('#admetLegacyWarning')).toBeVisible();
   expect(await profiles(page)).toEqual([]);
   await expect(page.locator('#historyList img')).toHaveCount(0);
+  await expand(page, 'admetHistorySection');
   await page.locator('[data-load-session="old-session"]').click();
   await expect(page.locator('#historyMsg')).toContainText('was not loaded');
   expect(await profiles(page)).toEqual([]);
@@ -131,6 +142,7 @@ test('PubChem adds identity only, never copies its numeric properties into sourc
 test('wrong stereoisomer, absent confirmation and file-plus-paste ambiguity leave dataset unchanged', async ({ page }) => {
   const { errors } = await open(page);
   await add(page);
+  await expand(page, 'admetImportSection');
   await page.locator('#admetSourceText').fill(swiss);
   await page.locator('#admetImportResults').click();
   await expect(page.locator('#admetSourceMessage')).toContainText('Confirm the provider');
@@ -203,11 +215,13 @@ test('500 structures prepare 200/200/100 manual Swiss batches without invoking S
   await page.locator('#admetIdentityInput').fill(Array.from({ length: 500 }, (_, i) => `[${i + 1}CH4]`).join('\n'));
   await page.locator('#admetAddIdentity').click();
   await expect(page.locator('#admetSourceMessage')).toContainText('Added 500 structures');
+  await expand(page, 'admetImportSection');
   await page.locator('#admetSwissInputs').click();
   await expect(page.locator('#admetSwissDownloads button')).toHaveText(['Download batch 1 (200)', 'Download batch 2 (200)', 'Download batch 3 (100)']);
   expect((await profiles(page)).every(p => Object.keys(p.values).length === 0)).toBe(true);
   // A shuffled batch must fill existing exact matches, not append 500 duplicate profiles.
   const batch = 'SMILES,GI absorption,Consensus Log P\n' + Array.from({ length: 500 }, (_, i) => `[${500 - i}CH4],High,0.00`).join('\n');
+  await expand(page, 'admetImportOptions');
   await page.locator('#admetImportTarget').selectOption('');
   await paste(page, 'swissadme', batch);
   await expect(page.locator('#admetSourceMessage')).toContainText('Imported 500 SwissADME');
@@ -233,6 +247,7 @@ test('ProTox API persists jobs, uses exact input, and attaches source results to
   await expect(page.locator('#admetApiStatus')).toContainText('adapter available');
   await expect(page.locator('#admetRunProtox')).toBeDisabled();
   await page.locator('#admetApiConsent').check();
+  await expand(page, 'admetQueueOptions');
   await page.locator('#admetRunProtox').click();
   await expect(page.locator('#admetSourceMessage')).toContainText('waiting 30s');
   expect((await profiles(page))[0].protoxJob).toMatchObject({ id: 'fixture-job-1', inputSmiles: smiles, status: 'pending' });
@@ -259,7 +274,8 @@ test('ProTox quota errors and cancelled pending jobs never create results or res
     return route.request().url().endsWith('/enqueue') ? json(route, { jobId: 'pending-job', retryAfter: 5 }) : json(route, { jobId: 'pending-job', state: 'pending', retryAfter: 30 });
   } });
   await page.clock.install();
-  await add(page); await page.locator('#admetApiConsent').check(); await page.locator('#admetRunProtox').click();
+  await add(page); await page.locator('#admetApiConsent').check();
+  await expand(page, 'admetQueueOptions'); await page.locator('#admetRunProtox').click();
   await expect(page.locator('#admetSourceMessage')).toContainText('quota reached');
   expect((await profiles(page))[0].values).toEqual({}); expect(requests).toHaveLength(1);
   mode = 'pending'; await page.locator('#admetRunProtox').click();
@@ -275,5 +291,319 @@ test('ProTox quota errors and cancelled pending jobs never create results or res
   await page.locator('#admetStopProtox').click();
   expect(requests.filter(url => url.endsWith('/enqueue'))).toHaveLength(2); // first failed + second explicitly requested
   expect(requests.filter(url => url.endsWith('/retrieve'))).toHaveLength(1);
+  expect(errors).toEqual([]);
+});
+
+// Automatic-flow fixtures below exercise orchestration, not live provider accuracy.
+function ready(jobId, { partial = false } = {}) {
+  const files = [
+    { type: 'acute toxicity', url: `https://tox.charite.de/protox3/csv/${jobId}_tox_class.csv`, text: 'Target\tPrediction\tProbability\nLD50\t7000\t88.40\ntox_class\t6\t88.40' },
+    { type: 'toxicity model', url: `https://tox.charite.de/protox3/csv/${jobId}_result.csv`, text: 'Target\tPrediction\tProbability\ndili\t0\t0.00' },
+    { type: 'toxicity target', url: `https://tox.charite.de/protox3/csv/${jobId}_tox_targets.csv`, text: 'Target\tPrediction\tProbability\nFixture target\t3\t0.60' }
+  ];
+  return { state: 'ready', jobId, files: partial ? files.slice(0, 1) : files, missing: partial ? ['toxicity model', 'toxicity target'] : [] };
+}
+
+for (const file of ['index.html', 'admet.html']) {
+  test(`${file}: one Start action adds inputs, retrieves ProTox and keeps optional material collapsed`, async ({ page }) => {
+    const requests = [];
+    const { errors, external } = await open(page, { file, api: true, onApi: route => {
+      requests.push({ path: new URL(route.request().url()).pathname, body: route.request().postDataJSON() });
+      return route.request().url().endsWith('/enqueue') ? json(route, { jobId: 'auto-fixture', retryAfter: 5 }) : json(route, ready('auto-fixture'));
+    } });
+    await page.clock.install();
+    for (const id of ['admetInputOptions', 'admetQueueOptions', 'admetImportSection', 'admetSelectedRecord', 'admetHistorySection', 'admetHelp']) {
+      expect(await page.locator('#' + id).evaluate(el => el.open)).toBe(false);
+    }
+    await page.locator('#admetIdentityInput').fill(smiles);
+    await expect(page.locator('#admetAutoRun')).toBeDisabled();
+    expect(await profiles(page)).toEqual([]);
+    expect(requests).toHaveLength(0);
+    await page.locator('#admetApiConsent').check();
+    await page.locator('#admetAutoRun').click();
+    await expect(page.locator('#admetSourceMessage')).toContainText('waiting 30s');
+    await expect(page.locator('#admetIdentityInput')).toBeDisabled();
+    await expect(page.locator('#admetAutoRun')).toBeDisabled();
+    await expect(page.locator('#admetStopProtox')).toBeVisible();
+    await expect(page.locator('#admetQueueLabel')).toContainText('0/1');
+    expect((await profiles(page))[0]).toMatchObject({ identity: { smiles }, values: {}, protoxJob: { id: 'auto-fixture', status: 'pending' } });
+    expect(requests).toHaveLength(1);
+    await page.clock.fastForward(30000);
+    await expect(page.locator('#admetSourceMessage')).toContainText('1 source profile(s) received');
+    await expect(page.locator('#admetQueueMeter')).toHaveAttribute('value', '1');
+    await expect(page.locator('#admetStopProtox')).toBeHidden();
+    await expect(page.locator('#admetIdentityInput')).toHaveValue(smiles);
+    const [p] = await profiles(page);
+    expect(p.protoxJob.status).toBe('complete');
+    expect(p.values.ld50.value).toBe('7000');
+    expect(p.values.hepato.probability.value).toBe('0.00');
+    expect(p.values.mw).toBeUndefined();
+    expect(p.imports).toHaveLength(3);
+    expect(requests[0].body.smiles).toBe(smiles);
+    expect(requests[1].body.jobId).toBe('auto-fixture');
+    await expect(page.locator('#admetSourceText')).toBeHidden();
+    await page.locator('[data-review]').click();
+    await expect(page.locator('#admetSelectedRecord')).toHaveAttribute('open', '');
+    await expect(page.locator('#admetSelectedRecord > summary')).toBeFocused();
+    await expect(page.locator('#admetSourceDetails > .source-table-wrap tbody tr')).toHaveCount(4);
+    await expect(page.locator('#admetMissingFields .source-table-wrap')).toBeHidden();
+    await page.locator('#admetMissingFields > summary').focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#admetMissingFields .source-table-wrap')).toBeVisible();
+    await page.locator('#admetAutoRun').click();
+    await expect(page.locator('#admetSourceMessage')).toContainText('No missing ProTox profiles');
+    expect(requests).toHaveLength(2); // A completed input is not submitted again.
+    await expand(page, 'admetHistorySection');
+    await page.locator('#historySessionName').fill('Automatic fixture session');
+    await page.locator('#historySaveBtn').click();
+    await expect(page.locator('#historyMsg')).toContainText('evidence saved');
+    expect(await page.evaluate(() => JSON.parse(window.__historySaved[0].compounds)[0].imports.length)).toBe(3);
+    expect(external.filter(url => /swissadme\.ch|tox\.charite\.de/.test(url))).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+}
+
+test('automatic batches queue only pasted exact identities, deduplicate input and keep unrelated records untouched', async ({ page }) => {
+  const requests = [];
+  let nextJob = 0;
+  const { errors } = await open(page, { api: true, onApi: route => {
+    const body = route.request().postDataJSON(); requests.push({ path: new URL(route.request().url()).pathname, body });
+    return route.request().url().endsWith('/enqueue') ? json(route, { jobId: `scoped-${++nextJob}`, retryAfter: 5 }) : json(route, ready(body.jobId));
+  } });
+  await page.clock.install();
+  await add(page, 'CCN', 'Unrelated pending compound');
+  await add(page, smiles, 'Existing exact compound');
+  const existingId = (await profiles(page))[1].id;
+  const input = `${smiles}\nCCO\n${smiles}`;
+  await page.locator('#admetIdentityInput').fill(input);
+  await page.locator('#admetApiConsent').check();
+  await page.locator('#admetAutoRun').click();
+  await expect(page.locator('#admetSourceMessage')).toContainText('scoped-1: waiting 30s');
+  expect(requests).toHaveLength(1);
+  await page.clock.fastForward(30000);
+  await expect(page.locator('#admetQueueLabel')).toContainText('1/2');
+  expect(requests).toHaveLength(2); // No parallel second submission.
+  await page.clock.fastForward(5000);
+  await expect(page.locator('#admetSourceMessage')).toContainText('scoped-2: waiting 30s');
+  await page.clock.fastForward(30000);
+  await expect(page.locator('#admetSourceMessage')).toContainText('2 source profile(s) received');
+  const result = await profiles(page);
+  expect(result).toHaveLength(3);
+  expect(result[0].values).toEqual({});
+  expect(result[0].protoxJob).toBeUndefined();
+  expect(result[1].id).toBe(existingId);
+  expect(result[1].identity.label).toBe('Existing exact compound');
+  expect(result.slice(1).every(p => p.protoxJob.status === 'complete')).toBe(true);
+  expect(requests.filter(r => r.path.endsWith('/enqueue')).map(r => r.body.smiles)).toEqual([smiles, 'CCO']);
+  await expect(page.locator('#admetIdentityInput')).toHaveValue(input);
+  expect(errors).toEqual([]);
+});
+
+test('names and CIDs resolve automatically and enrich an exact existing identity without copying PubChem properties', async ({ page }) => {
+  const lookup = [], submitted = [];
+  const { errors } = await open(page, { api: true, onLookup: route => {
+    lookup.push(route.request().url());
+    if (route.request().url().includes('/compound/name/cids/')) {
+      expect(new URLSearchParams(route.request().postData()).get('name')).toBe('Fixture acid');
+      return json(route, { IdentifierList: { CID: [2244] } });
+    }
+    return json(route, { PropertyTable: { Properties: [{ CID: 2244, Title: 'Fixture acid', SMILES: smiles, MolecularWeight: '999.99' }] } });
+  }, onApi: route => {
+    if (route.request().url().endsWith('/enqueue')) { submitted.push(route.request().postDataJSON().smiles); return json(route, { jobId: 'resolved-fixture', retryAfter: 5 }); }
+    return json(route, ready('resolved-fixture'));
+  } });
+  await page.clock.install();
+  await add(page);
+  const id = (await profiles(page))[0].id;
+  await page.locator('#admetIdentityType').selectOption('cid');
+  await page.locator('#admetIdentityInput').fill('Fixture acid\n2244');
+  await page.locator('#admetApiConsent').check();
+  await page.locator('#admetAutoRun').click();
+  await expect.poll(() => lookup.length).toBe(1);
+  await page.clock.runFor(500);
+  await expect(page.locator('#admetSourceMessage')).toContainText('waiting 30s');
+  expect(lookup).toHaveLength(2);
+  await page.clock.fastForward(30000);
+  await expect(page.locator('#admetSourceMessage')).toContainText('1 source profile(s) received');
+  const result = await profiles(page);
+  expect(result).toHaveLength(1);
+  expect(result[0]).toMatchObject({ id, identity: { cid: '2244', smiles } });
+  expect(result[0].values.mw).toBeUndefined();
+  expect(result[0].values.formula).toBeUndefined();
+  expect(submitted).toEqual([smiles]);
+  expect(errors).toEqual([]);
+});
+
+test('invalid, oversized or unresolved inputs never submit unrelated pending compounds', async ({ page }) => {
+  const lookup = [], requests = [];
+  const { errors } = await open(page, { api: true, onLookup: route => {
+    lookup.push(route.request().url());
+    if (route.request().url().includes('/compound/name/cids/')) {
+      const name = new URLSearchParams(route.request().postData()).get('name');
+      return json(route, { IdentifierList: { CID: name === 'Good fixture' ? [2244] : [1, 2] } });
+    }
+    return json(route, { PropertyTable: { Properties: [{ CID: 2244, Title: 'Good fixture', SMILES: 'CCO' }] } });
+  }, onApi: route => { requests.push(route.request().url()); return json(route, { error: 'Unexpected submission in a validation test' }, 503); } });
+  await add(page, 'CCN', 'Unrelated');
+  await page.locator('#admetIdentityInput').fill('C C');
+  await page.locator('#admetApiConsent').check();
+  await page.locator('#admetAutoRun').click();
+  await expect(page.locator('#admetSourceMessage')).toContainText('one exact SMILES');
+  expect(await profiles(page)).toHaveLength(1);
+  const tooMany = Array.from({ length: 501 }, (_, i) => `[${i + 1}CH4]`).join('\n');
+  await page.locator('#admetIdentityInput').fill(tooMany);
+  await expect(page.locator('#admetInputCount')).toHaveText('501 / 500');
+  await page.locator('#admetAutoRun').click();
+  await expect(page.locator('#admetSourceMessage')).toContainText('1–500 identifiers');
+  expect(lookup).toHaveLength(0);
+  expect(requests).toHaveLength(0);
+  // An individually valid 500-input batch must also respect the total dataset cap.
+  await page.locator('#admetIdentityInput').fill(tooMany.split('\n').slice(0, 500).join('\n'));
+  await page.locator('#admetAutoRun').click();
+  await expect(page.locator('#admetSourceMessage')).toContainText('exceeds 500 compounds');
+  expect(await profiles(page)).toHaveLength(1);
+  expect(requests).toHaveLength(0);
+  await page.locator('#admetIdentityType').selectOption('cid');
+  await page.locator('#admetIdentityInput').fill('Good fixture\nAmbiguous fixture');
+  await page.locator('#admetAutoRun').click();
+  await expect(page.locator('#admetSourceMessage')).toContainText('Nothing was submitted to ProTox');
+  await expect(page.locator('#admetSourceMessage')).toContainText('multiple PubChem records');
+  await expect(page.locator('#admetIdentityInput')).toHaveValue('Good fixture\nAmbiguous fixture');
+  const result = await profiles(page);
+  expect(result).toHaveLength(2); // Resolved identities may be retained, but never silently run.
+  expect(result.every(p => !p.protoxJob && !Object.keys(p.values).length)).toBe(true);
+  expect(requests).toHaveLength(0);
+  expect(errors).toEqual([]);
+});
+
+test('Stop during identity resolution aborts the automatic flow before any provider submission', async ({ page }) => {
+  let releaseLookup;
+  const requests = [];
+  const { errors } = await open(page, { api: true, onLookup: async route => {
+    await new Promise(resolve => { releaseLookup = resolve; });
+    await json(route, { PropertyTable: { Properties: [{ CID: 2244, Title: 'Stopped fixture', SMILES: smiles }] } });
+  }, onApi: route => { requests.push(route.request().url()); return json(route, { error: 'Unexpected submission' }, 503); } });
+  await add(page, 'CCN');
+  await page.locator('#admetIdentityType').selectOption('cid');
+  await page.locator('#admetIdentityInput').fill('2244');
+  await page.locator('#admetApiConsent').check();
+  await page.locator('#admetAutoRun').click();
+  await expect.poll(() => typeof releaseLookup).toBe('function');
+  await page.locator('#admetStopProtox').click();
+  await expect(page.locator('#admetSourceMessage')).toContainText('Queue stopped');
+  releaseLookup();
+  await expect(page.locator('#admetIdentityInput')).toBeEnabled();
+  await expect(page.locator('#admetIdentityInput')).toHaveValue('2244');
+  expect(await profiles(page)).toHaveLength(1);
+  expect((await profiles(page))[0].protoxJob).toBeUndefined();
+  expect(requests).toHaveLength(0);
+  expect(errors).toEqual([]);
+});
+
+test('revoking consent stops the queue; a reloaded pending job resumes without a new submission, even at the daily limit', async ({ page }) => {
+  const requests = [];
+  const { errors } = await open(page, { api: true, onApi: route => {
+    requests.push(route.request().url());
+    return route.request().url().endsWith('/enqueue') ? json(route, { jobId: 'resume-fixture', retryAfter: 5 }) : json(route, ready('resume-fixture'));
+  } });
+  await page.clock.install();
+  await page.locator('#admetIdentityInput').fill(smiles);
+  await page.locator('#admetApiConsent').check();
+  await page.locator('#admetAutoRun').click();
+  await expect(page.locator('#admetSourceMessage')).toContainText('waiting 30s');
+  await page.locator('#admetApiConsent').uncheck();
+  await expect(page.locator('#admetSourceMessage')).toContainText('Queue stopped');
+  expect((await profiles(page))[0].protoxJob.status).toBe('pending');
+  await page.evaluate(() => localStorage.setItem('ddu_protox_usage', JSON.stringify({ day: new Date().toISOString().slice(0, 10), count: 250 })));
+  await page.reload();
+  await page.evaluate(() => { showApp({ id: 'fixture-user', email: 'admet-test@example.test' }); setActivePanel('admetTab'); });
+  await expect(page.locator('#admetAutoRun')).toHaveText('Profile pending (1) ↗');
+  await expect(page.locator('#admetAutoRun')).toBeDisabled();
+  await page.locator('#admetApiConsent').check();
+  await page.locator('#admetAutoRun').click();
+  await expect(page.locator('#admetSourceMessage')).toContainText('resume-fixture: waiting 30s');
+  await page.clock.fastForward(30000);
+  await expect(page.locator('#admetSourceMessage')).toContainText('1 source profile(s) received');
+  expect(requests.filter(url => url.endsWith('/enqueue'))).toHaveLength(1);
+  expect(requests.filter(url => url.endsWith('/retrieve'))).toHaveLength(1);
+  expect((await profiles(page))[0].protoxJob.status).toBe('complete');
+  expect(errors).toEqual([]);
+});
+
+test('partial automatic responses keep missing values missing and resume the saved job', async ({ page }) => {
+  const requests = [];
+  let retrieves = 0;
+  const { errors } = await open(page, { api: true, onApi: route => {
+    requests.push(route.request().url());
+    if (route.request().url().endsWith('/enqueue')) return json(route, { jobId: 'partial-fixture', retryAfter: 5 });
+    return json(route, ready('partial-fixture', { partial: ++retrieves === 1 }));
+  } });
+  await page.clock.install();
+  await page.locator('#admetIdentityInput').fill(smiles);
+  await page.locator('#admetApiConsent').check();
+  await page.locator('#admetAutoRun').click();
+  await expect(page.locator('#admetSourceMessage')).toContainText('waiting 30s');
+  await page.clock.fastForward(30000);
+  await expect(page.locator('#admetSourceMessage')).toContainText('Partial ProTox output');
+  let [p] = await profiles(page);
+  expect(p.protoxJob.status).toBe('partial');
+  expect(p.values.hepato).toBeUndefined();
+  expect(p.values.ld50.value).toBe('7000');
+  await page.locator('#admetAutoRun').click();
+  await expect(page.locator('#admetSourceMessage')).toContainText('waiting 30s');
+  await page.clock.fastForward(30000);
+  await expect(page.locator('#admetSourceMessage')).toContainText('1 source profile(s) received');
+  [p] = await profiles(page);
+  expect(p.protoxJob.status).toBe('complete');
+  expect(p.values.hepato.value).toBe('Inactive');
+  expect(p.imports).toHaveLength(4); // The first partial evidence remains archived.
+  expect(requests.filter(url => url.endsWith('/enqueue'))).toHaveLength(1);
+  expect(requests.filter(url => url.endsWith('/retrieve'))).toHaveLength(2);
+  expect(errors).toEqual([]);
+});
+
+test('500-input automatic runs require the 250-job cap confirmation and stop on provider quota errors', async ({ page }) => {
+  const requests = [];
+  const { errors } = await open(page, { api: true, onApi: route => {
+    requests.push(route.request().url()); return json(route, { error: 'ProTox daily quota reached' }, 403);
+  } });
+  const input = Array.from({ length: 500 }, (_, i) => `[${i + 1}CH4]`).join('\n');
+  await page.locator('#admetIdentityInput').fill(input);
+  await page.locator('#admetApiConsent').check();
+  page.once('dialog', dialog => { expect(dialog.message()).toContain('first 250 of 500'); return dialog.dismiss(); });
+  await page.locator('#admetAutoRun').click();
+  await expect(page.locator('#admetAutoRun')).toBeEnabled();
+  expect(await profiles(page)).toHaveLength(500);
+  expect(requests).toHaveLength(0);
+  await expect(page.locator('#admetQueueProgress')).toBeHidden();
+  await expect(page.locator('#admetSourceMessage')).toContainText('Profiling cancelled');
+  await expect(page.locator('#admetIdentityInput')).toHaveValue(input);
+  page.once('dialog', dialog => { expect(dialog.message()).toContain('first 250 of 500'); return dialog.accept(); });
+  await page.locator('#admetAutoRun').click();
+  await expect(page.locator('#admetSourceMessage')).toContainText('quota reached');
+  await expect(page.locator('#admetQueueLabel')).toContainText('0/250');
+  expect(requests).toHaveLength(1);
+  expect((await profiles(page)).every(p => Object.keys(p.values).length === 0)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('compact ADMET stays accessible and responsive with imports, received values and evidence expanded', async ({ page }) => {
+  const AxeBuilder = require('@axe-core/playwright').default;
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const { errors } = await open(page, { api: true });
+  await add(page);
+  await paste(page, 'swissadme', swiss);
+  await paste(page, 'protox', protox);
+  await expand(page, 'admetImportOptions');
+  await expand(page, 'admetQueueOptions');
+  await expand(page, 'admetHistorySection');
+  await page.locator('[data-review]').click();
+  await expect(page.locator('#admetSourceDetails > .source-table-wrap')).toBeVisible();
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth), `${width}px expanded ADMET`).toBeLessThanOrEqual(width);
+  }
+  const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+  expect(result.violations.map(v => ({ rule: v.id, nodes: v.nodes.map(n => n.target) }))).toEqual([]);
   expect(errors).toEqual([]);
 });
