@@ -52,6 +52,10 @@ The spreadsheet contains successful records with the original input, actual look
 
 A literature name may be absent from PubChem, ambiguous, or misspelled. Formatting and retries cannot create a missing record. Verify the spelling or supply a CID/structure from a trusted source; do not remove α/β, D/L, primes or substituents to obtain a different compound. Browser/network access to PubChem and NCBI is still required.
 
+### SDF ZIP downloads
+
+The SDF ZIP contains two folders: **`3D sdf/`** for available 3D structures and **`2D sdf/`** for 2D fallbacks only. Each compound is requested in 3D first; 2D is requested only if that 3D request fails or returns no structure. A compound with a downloaded 3D file is not also downloaded in 2D. Each structure remains a separate, named `.sdf` file; both folders are included even if one is empty. Compounds with neither structure are reported as unavailable, not replaced with invented coordinates.
+
 ## Source-only ADMET: SwissADME + ProTox 3.0
 
 Both `index.html` and `admet.html` use the same `assets/admet-sources.js` parser/schema, `assets/protox-client.js` API client, and `assets/admet-source-ui.js` interface. The old heuristic engines, hard-coded predictions, editable unsourced result fields, fabricated sample datasets, approximated BOILED-Egg/radar plots and pkCSM report attribution have been removed. No local ADMET or toxicity prediction is generated.

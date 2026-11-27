@@ -1,8 +1,9 @@
 const { test, expect } = require('@playwright/test');
 const fs = require('node:fs/promises');
+const JSZip = require('jszip');
 
 // All remote responses here are fixtures. No chemical database access or login is required.
-async function openLookup(page, apiHandler) {
+async function openLookup(page, apiHandler, { sdfZip = false } = {}) {
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(error.message));
   await page.addInitScript(() => {
@@ -27,6 +28,10 @@ async function openLookup(page, apiHandler) {
     const url = route.request().url();
     if (url.includes('/rest/pug/') || url.includes('eutils.ncbi.nlm.nih.gov')) {
       return apiHandler(route);
+    }
+    if (sdfZip && url === 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js') {
+      // Exercise the same real ZIP library as production without CDN access.
+      return route.fulfill({ status: 200, contentType: 'application/javascript', path: require.resolve('jszip/dist/jszip.min.js') });
     }
     // Isolate unrelated CDNs, authentication, fonts and structure images.
     return route.fulfill({ status: 200, contentType: 'application/javascript', body: '' });
@@ -294,3 +299,67 @@ test('file imports accept 500 entries and clearly report truncation above the li
   expect(requests).toBe(0);
   expect(errors).toEqual([]);
 });
+
+// Synthetic file contents used only to check archive paths and unchanged bytes.
+const sdfFixture = (cid, dim) => `Fixture ${cid} ${dim}\n  DDU ZIP test\n\n  0  0  0  0  0  0            999 V2000\nM  END\n$$$$\n`;
+async function downloadStructureZip(page) {
+  const event = page.waitForEvent('download');
+  await page.locator('#downloadSdfBtn').click();
+  const download = await event;
+  expect(download.suggestedFilename()).toMatch(/^pubchem-structures-\d{4}-\d{2}-\d{2}\.zip$/);
+  const zip = await JSZip.loadAsync(await fs.readFile(await download.path()));
+  await expect(page.locator('#downloadSdfBtn')).toBeEnabled();
+  await expect(page.locator('#exportModal')).not.toHaveClass(/open/);
+  expect(zip.files['2D sdf/'].dir).toBe(true);
+  expect(zip.files['3D sdf/'].dir).toBe(true);
+  return zip;
+}
+
+test('SDF ZIP separates 3D structures and only the remaining 2D fallbacks into two folders', async ({ page }) => {
+  const requests = [];
+  const errors = await openLookup(page, route => {
+    if (propertyIds(route)) return propertyReply(route);
+    const url = new URL(route.request().url());
+    const cid = url.pathname.match(/\/cid\/(\d+)\/record\/SDF$/)?.[1];
+    const dim = url.searchParams.get('record_type');
+    requests.push(`${cid}/${dim}`);
+    if ((cid === '101' && dim === '3d') || (cid === '102' && dim === '2d')) {
+      return route.fulfill({ status: 200, contentType: 'chemical/x-mdl-sdfile', body: sdfFixture(cid, dim) });
+    }
+    return noMatch(route);
+  }, { sdfZip: true });
+  await run(page, ['101', '102', '103']);
+  const zip = await downloadStructureZip(page);
+  expect(Object.keys(zip.files).sort()).toEqual([
+    '2D sdf/', '2D sdf/API_fixture_102_CID102_2D.sdf',
+    '3D sdf/', '3D sdf/API_fixture_101_CID101_3D.sdf'
+  ]);
+  expect(await zip.file('3D sdf/API_fixture_101_CID101_3D.sdf').async('string')).toBe(sdfFixture('101', '3d'));
+  expect(await zip.file('2D sdf/API_fixture_102_CID102_2D.sdf').async('string')).toBe(sdfFixture('102', '2d'));
+  expect(requests).toEqual(['101/3d', '102/3d', '102/2d', '103/3d', '103/2d']);
+  expect(requests).not.toContain('101/2d');
+  await expect(page.locator('.toast').filter({ hasText: 'ZIP downloaded' })).toContainText('1 3D, 1 2D fallback');
+  await expect(page.locator('.toast').filter({ hasText: 'ZIP downloaded' })).toContainText('Unavailable: API fixture 103');
+  expect(errors).toEqual([]);
+});
+
+for (const available of ['3d', '2d']) {
+  test(`SDF ZIP keeps both folders when only ${available.toUpperCase()} files are downloaded`, async ({ page }) => {
+    const requests = [];
+    const errors = await openLookup(page, route => {
+      if (propertyIds(route)) return propertyReply(route);
+      const dim = new URL(route.request().url()).searchParams.get('record_type');
+      requests.push(dim);
+      return dim === available
+        ? route.fulfill({ status: 200, contentType: 'chemical/x-mdl-sdfile', body: sdfFixture('101', dim) })
+        : noMatch(route);
+    }, { sdfZip: true });
+    await run(page, ['101']);
+    const zip = await downloadStructureZip(page);
+    const files = Object.values(zip.files).filter(file => !file.dir);
+    expect(files.map(file => file.name)).toEqual([`${available.toUpperCase()} sdf/API_fixture_101_CID101_${available.toUpperCase()}.sdf`]);
+    expect(await files[0].async('string')).toBe(sdfFixture('101', available));
+    expect(requests).toEqual(available === '3d' ? ['3d'] : ['3d', '2d']);
+    expect(errors).toEqual([]);
+  });
+}

@@ -1147,6 +1147,8 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
     const originalLabel = downloadSdfBtn.innerHTML;
 
     const zip = new JSZip();
+    zip.folder('2D sdf');
+    zip.folder('3D sdf');
     const usedNames = {};
     let count3d = 0, count2d = 0;
     let unavailable = [];
@@ -1169,7 +1171,7 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
         const { sdf, type } = await fetchSdfWithFallback(r.cid);
         const record = sdf.trim().endsWith('$$$$') ? sdf : sdf + '\n$$$$\n';
         const suffix = type === '3D' ? '_3D' : '_2D';
-        zip.file(fileName + suffix + '.sdf', record);
+        zip.file(`${type} sdf/${fileName}${suffix}.sdf`, record);
         if (type === '3D') count3d++; else count2d++;
       } catch (err) {
         unavailable.push(r.name || r.cid);
@@ -1978,6 +1980,8 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
     downloadSdfBtn.disabled = true;
 
     const zip = new JSZip();
+    zip.folder('2D sdf');
+    zip.folder('3D sdf');
     const usedNames = {};
     let count3d = 0, count2d = 0;
     let unavailable = [];
@@ -1994,7 +1998,7 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
       try {
         const { sdf, type } = await fetchSdfWithFallback(r.cid);
         const record = sdf.trim().endsWith('$$$$') ? sdf : sdf + '\n$$$$\n';
-        zip.file(fileName + (type === '3D' ? '_3D' : '_2D') + '.sdf', record);
+        zip.file(`${type} sdf/${fileName}_${type}.sdf`, record);
         if (type === '3D') count3d++; else count2d++;
       } catch (err) { unavailable.push(r.name || r.cid); }
     }
@@ -2020,7 +2024,7 @@ var docx=function(e){"use strict";var t=Object.defineProperty,r=Object.definePro
     setTimeout(() => {
       hideExportProgress();
       let msg = `${count3d + count2d} SDF file(s)`;
-      if (count3d > 0 && count2d > 0) msg += ` (${count3d} 3D, ${count2d} 2D)`;
+      if (count3d > 0 && count2d > 0) msg += ` (${count3d} 3D, ${count2d} 2D fallback)`;
       if (unavailable.length > 0) msg += `. Unavailable: ${unavailable.join(', ')}`;
       showToast('ZIP downloaded', msg, unavailable.length > 0 ? 'info' : 'success');
     }, 600);
