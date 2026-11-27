@@ -88,8 +88,9 @@ The easiest way to keep the provider structures aligned is to **import SwissADME
 
 Deploy the HTML, `assets/`, `functions/`, `server/` and `_routes.json` together using **Cloudflare Pages Git integration**. No new API secret or environment variable is required: the adapter validates the existing Supabase user JWT against the same auth service the site already uses. The public anon key is not a service-role credential. The JWT is **never forwarded to ProTox**. Restricting the app’s public/shared guest account or changing Supabase RLS policies is a separate administration task.
 
-- `GET /api/protox/status` reports whether the adapter exists, **not upstream health or scientific accuracy**.
-- `POST /api/protox/enqueue` and `/retrieve` require a valid login. Upstream URLs are fixed; this is not an arbitrary proxy. Requests/responses have size limits, network timeouts and redirect rejection. No insecure TLS overrides are used.
+- `GET /api/protox/status` reports whether the adapter exists and its `adapterVersion`, **not upstream health or scientific accuracy**. Version `2026-11-27.1` includes the Workers redirect-mode correction.
+- `POST /api/protox/enqueue` and `/retrieve` require a valid login. Upstream URLs are fixed; this is not an arbitrary proxy. Requests/responses have size limits, network timeouts and redirect rejection. Both authentication and provider fetches use **`redirect: 'manual'` and explicitly reject HTTP 3xx**. Cloudflare Workers does not support `redirect: 'error'`; that earlier setting threw before session verification and caused the generic “ProTox integration failed” banner. Redirects are still never followed, and no insecure TLS overrides are used.
+- Sign-in verification failures now distinguish an expired/rejected session (sign in again) from an unavailable, unreachable, redirected or unreadable authentication service response. These failures stop before sending any ProTox request and do not expose tokens or raw internal exceptions.
 - Jobs are sequential, with at least 30 seconds between retrieval checks and provider `Retry-After` waits respected. Enqueue POSTs are **not automatically retried**, because a lost response may already have submitted the compound. A timeout, rate limit or quota error stops the queue instead of generating substitute values.
 - ProTox documents **250 API queries per source IP/day**. A browser attempts at most 250 new submissions per UTC day; the provider is authoritative and a shared server egress IP may hit its quota earlier. This does not mean 250 predictions are guaranteed or that the 500-compound PubChem limit applies to provider submissions. Pending/partial jobs retain their IDs and exact request SMILES so *Run / resume* retrieves the existing job rather than enqueuing it again. Keep the tab open while processing. Stop/reload does not cancel a job already submitted at the provider.
 - GitHub Pages and `python -m http.server` do not run Pages Functions. Imports, evidence review and exports still work; automated ProTox retrieval is clearly disabled there.
@@ -109,11 +110,14 @@ WRANGLER_SEND_METRICS=false npx --yes wrangler@4.168.0 pages functions build --o
 
 ## Tests
 
-Use Node.js 22+ for the dependency-free resolver, source parser, API adapter/client and static-script tests:
+Use Node.js **22.12+**. The resolver, parser and deployed adapter remain dependency-free; development dependencies supply browser testing and the actual Workers runtime:
 
 ```sh
+npm ci
 npm test
 ```
+
+`npm test` includes `tests/protox-runtime.test.cjs`. These regressions run the unmodified adapter in Cloudflare's **workerd** through pinned Miniflare (the same version bundled with Wrangler 4.168.0). Authentication/provider responses are intercepted at the outbound-service boundary, **after native fetch validates request options**, rather than replacing `fetch` inside the handler. This reproduces runtime incompatibilities such as unsupported redirect modes, while making no live provider submissions. Tests also check that redirects cannot leak a bearer or replay a submission, and that result retrieval preserves job identity and raw source files. Run just these checks with `npm run test:runtime`.
 
 Browser regression tests use Playwright and axe-core for automated accessibility checks:
 

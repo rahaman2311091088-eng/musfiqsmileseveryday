@@ -3,6 +3,7 @@
 const ORIGIN = 'https://tox.charite.de';
 const ROOT = `${ORIGIN}/protox3/`;
 const AUTH_URL = 'https://lfizlfdlrrmtkgzdmncc.supabase.co/auth/v1/user';
+const ADAPTER_VERSION = '2026-11-27.1';
 // Public anon key already used by the website. This is NOT a service-role credential.
 const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmaXpsZmRscnJtdGtnemRtbmNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyNDA3NTYsImV4cCI6MjA5NzgxNjc1Nn0.2oD5KlqRGber12j117F-VmJSHT66z-souEj5Q5CF_Ik';
 export const MODELS = 'acute_tox dili neuro nephro respi cardio carcino immuno mutagen cyto bbb eco clinical nutri nr_ahr nr_ar nr_ar_lbd nr_aromatase nr_er nr_er_lbd nr_ppar_gamma sr_are sr_hse sr_mmp sr_p53 sr_atad5 mie_thr_alpha mie_thr_beta mie_ttr mie_ryr mie_gabar mie_nmdar mie_ampar mie_kar mie_ache mie_car mie_pxr mie_nadhox mie_vgsc mie_nis CYP1A2 CYP2C19 CYP2C9 CYP2D6 CYP3A4 CYP2E1 tox_targets';
@@ -37,11 +38,14 @@ export function createHandler({ fetch: fetchImpl = globalThis.fetch.bind(globalT
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const response = await fetchImpl(ROOT + path, {
-        method: data ? 'POST' : 'GET', redirect: 'error', signal: controller.signal,
+        // Workers supports "manual", not "error". Reject 3xx explicitly below;
+        // never follow a provider redirect or replay a submission at another URL.
+        method: data ? 'POST' : 'GET', redirect: 'manual', signal: controller.signal,
         headers: data ? { 'Content-Type': 'application/x-www-form-urlencoded' } : { Accept: 'text/plain,text/csv' },
         ...(data ? { body: new URLSearchParams(data).toString() } : {})
       });
       const retryAfter = retrySeconds(response.headers.get('Retry-After'));
+      if (response.status >= 300 && response.status < 400) throw fail(502, 'ProTox returned a redirect, which was blocked. A submitted job may still exist; do not automatically resubmit.');
       if (response.status === 429) throw fail(429, 'ProTox is rate-limiting requests. Wait before resuming; no submission is automatically retried.', retryAfter);
       if (response.status === 403) throw fail(403, 'ProTox denied access or its shared source-IP daily quota was reached (250 queries/day). Try later or use a provider export.');
       if (!response.ok && response.status !== 404) throw fail(502, `ProTox returned HTTP ${response.status}. No predictions were substituted.`);
@@ -53,8 +57,25 @@ export function createHandler({ fetch: fetchImpl = globalThis.fetch.bind(globalT
       throw fail(502, 'Could not reach the ProTox API. A submitted job may still be running; do not automatically resubmit.');
     } finally { clearTimeout(timer); }
   }
+  async function verifySession(authorization) {
+    try {
+      // Cloudflare throws before fetching if redirect:"error" is used. Manual
+      // redirect handling also ensures the bearer never reaches a Location URL.
+      const auth = await fetchImpl(AUTH_URL, { headers: { Authorization: authorization, apikey: ANON_KEY }, redirect: 'manual', signal: AbortSignal.timeout(10000) });
+      if (auth.status >= 300 && auth.status < 400) throw fail(502, 'The sign-in check returned a redirect, which was blocked. No ProTox request was sent.');
+      if (auth.status === 401 || auth.status === 403) throw fail(401, 'Your session expired or could not be verified. Sign in again.');
+      if (!auth.ok) throw fail(503, 'The sign-in service is temporarily unavailable. No ProTox request was sent. Try again later.', auth.status === 429 ? retrySeconds(auth.headers.get('Retry-After')) : undefined);
+      let user;
+      try { user = JSON.parse(await readBounded(auth, 64000)); }
+      catch { throw fail(502, 'The sign-in service returned an unreadable response. No ProTox request was sent.'); }
+      if (!user || typeof user.id !== 'string' || !user.id) throw fail(401, 'Your session could not be verified. Sign in again.');
+    } catch (error) {
+      if (error.status) throw error;
+      throw fail(503, 'Could not reach the sign-in service to verify your session. No ProTox request was sent. Try again later.');
+    }
+  }
   return async function handle(request, action) {
-    if (action === 'status' && request.method === 'GET') return json({ available: true, provider: 'ProTox 3.0', dailySourceIpLimit: 250, note: 'Adapter available; upstream health and predictions are not implied.' });
+    if (action === 'status' && request.method === 'GET') return json({ available: true, provider: 'ProTox 3.0', adapterVersion: ADAPTER_VERSION, dailySourceIpLimit: 250, note: 'Adapter available; upstream health and predictions are not implied.' });
     if (request.method !== 'POST') return json({ error: 'Use POST for prediction requests.' }, 405);
     if (!['enqueue', 'retrieve'].includes(action)) return json({ error: 'Unknown action.' }, 404);
     try {
@@ -77,10 +98,7 @@ export function createHandler({ fetch: fetchImpl = globalThis.fetch.bind(globalT
       if (action === 'enqueue' && (typeof input.smiles !== 'string' || !input.smiles || input.smiles.length > 4000 || /\s|[<>]/.test(input.smiles))) throw fail(400, 'Supply one SMILES string, up to 4000 characters, without whitespace or HTML.');
       if (action === 'retrieve' && (typeof input.jobId !== 'string' || !ID.test(input.jobId))) throw fail(400, 'Invalid ProTox job ID.');
       // Validate a real logged-in user; never forward the user's JWT to ProTox.
-      const auth = await fetchImpl(AUTH_URL, { headers: { Authorization: authorization, apikey: ANON_KEY }, redirect: 'error', signal: AbortSignal.timeout(10000) });
-      if (!auth.ok) throw fail(401, 'Your session expired or could not be verified. Sign in again.');
-      const user = JSON.parse(await readBounded(auth, 64000));
-      if (!user.id) throw fail(401, 'Your session could not be verified.');
+      await verifySession(authorization);
       if (action === 'enqueue') {
         // Intentionally no retry: a lost POST response may have already created a job.
         const response = await upstream('src/api_enqueue.php', { input_type: 'smiles', input: input.smiles, requested_data: JSON.stringify([MODELS]) }, 2000);
