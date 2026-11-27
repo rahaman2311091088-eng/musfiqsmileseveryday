@@ -189,7 +189,7 @@
       for (let attempt = 0; ; attempt++) {
         try {
           return await schedule(async () => {
-            // Stop hammering a down service for every name in a 50-entry batch.
+            // Stop hammering a down service for every name in a large batch.
             const unavailable = unavailableHosts.get(host);
             if (unavailable && unavailable.until > Date.now()) throw unavailable.error;
             const controller = new AbortController();
