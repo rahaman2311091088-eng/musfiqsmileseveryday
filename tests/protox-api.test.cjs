@@ -33,7 +33,7 @@ test('API submission encodes exact stereochemical SMILES, uses fixed documented 
     assert.match(JSON.parse(body.get('requested_data'))[0], /acute_tox dili/);
     assert.match(JSON.parse(body.get('requested_data'))[0], /CYP2E1 tox_targets/);
     assert.equal(options.headers.Authorization, undefined);
-    assert.equal(options.redirect, 'error');
+    assert.equal(options.redirect, 'manual');
     return reply('fixture-job-0001', 200, { 'Retry-After': '45' });
   });
   const res = await handle(request('enqueue', { smiles: 'C[C@@H](O)/C=C\\C.[Na+]' }), 'enqueue');
@@ -41,6 +41,7 @@ test('API submission encodes exact stereochemical SMILES, uses fixed documented 
   assert.deepEqual((await res.json()).jobId, 'fixture-job-0001');
   assert.equal(calls.length, 2);
   assert.equal(calls[0].options.headers.Authorization, 'Bearer fixture-token');
+  assert.equal(calls[0].options.redirect, 'manual');
 });
 
 test('invalid input, cross-origin requests, unauthenticated requests, and URL/path injection are blocked before upstream', async () => {
@@ -81,6 +82,44 @@ test('429 Retry-After, 403 quota, malformed job IDs and service failures never c
     const body = await res.json(); assert.match(body.error, pattern);
     if (status === 429) assert.equal(body.retryAfter, 90);
     assert.equal(calls.length, 2);
+  }
+});
+
+test('all provider redirect statuses are explicitly rejected without another request', async () => {
+  for (const status of [301, 302, 303, 307, 308]) {
+    const { handle, calls } = await server(() => reply('', status, { Location: 'https://untrusted.example/submit' }));
+    const res = await handle(request('enqueue', { smiles: 'CCO' }), 'enqueue');
+    assert.equal(res.status, 502);
+    assert.match((await res.json()).error, /redirect.*blocked/);
+    assert.equal(calls.length, 2); // One auth check, one submission, no redirect/retry.
+    assert(calls.every(call => call.options.redirect === 'manual'));
+  }
+});
+
+test('session verification failures give actionable errors without contacting ProTox or leaking credentials', async () => {
+  const { createHandler } = await loadServer();
+  for (const [respond, status, pattern] of [
+    [() => { throw new TypeError('private transport detail'); }, 503, /reach the sign-in service/],
+    [() => { throw new DOMException('timed out', 'TimeoutError'); }, 503, /reach the sign-in service/],
+    [() => reply('', 302, { Location: 'https://untrusted.example/collect' }), 502, /sign-in.*redirect.*blocked/i],
+    [() => reply('unavailable', 503), 503, /sign-in service.*unavailable/i],
+    [() => reply('too many checks', 429, { 'Retry-After': '90' }), 503, /sign-in service.*unavailable/i],
+    [() => reply('<html>unexpected</html>'), 502, /unreadable response/],
+    [() => reply('null'), 401, /Sign in again/],
+    [() => reply({ id: 123 }), 401, /Sign in again/],
+    [() => reply('x'.repeat(64001)), 502, /unreadable response/]
+  ]) {
+    const calls = [];
+    const handle = createHandler({ fetch: async (url, options) => { calls.push({ url, options }); return respond(); } });
+    const res = await handle(request('enqueue', { smiles: 'CCO' }), 'enqueue');
+    const body = await res.json();
+    assert.equal(res.status, status);
+    assert.match(body.error, pattern);
+    assert.doesNotMatch(body.error, /fixture-token|private transport detail/);
+    if (body.retryAfter) assert.equal(body.retryAfter, 90);
+    assert.equal(calls.length, 1);
+    assert(calls[0].url.endsWith('/auth/v1/user'));
+    assert.equal(calls[0].options.redirect, 'manual');
   }
 });
 
