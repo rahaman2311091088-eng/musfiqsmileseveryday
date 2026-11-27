@@ -41,6 +41,8 @@
 .admet-source-app .admet-run-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px}
 .admet-source-app #admetAutoRun{min-height:44px;padding:10px 22px;font-size:13px;min-width:175px}
 .admet-source-app #admetApiStatus{flex:1;min-width:180px;font-size:10px}
+.admet-source-app #admetApiStatus[data-error=true]{color:var(--error)}
+.admet-source-app .admet-provider-recovery{margin:-8px 0 18px;gap:10px 16px}
 .admet-source-app .admet-queue-progress{margin-top:18px}
 .admet-source-app progress{appearance:none;display:block;width:100%;height:4px;border:0;border-radius:2px;overflow:hidden;background:var(--panel-line-solid);accent-color:var(--pine);margin-top:6px}
 .admet-source-app progress::-webkit-progress-bar{background:var(--panel-line-solid)}
