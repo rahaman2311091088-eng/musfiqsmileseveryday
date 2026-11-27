@@ -200,7 +200,7 @@ test('standalone ADMET keeps the shared brand and allows sign-in without a redir
   await noOverflow(page, 'standalone authentication');
   await signIn(page);
   await expect(page.locator('#admetApp')).toBeVisible();
-  await expect(page.locator('.source-title')).toHaveText('ADMET evidence.');
+  await expect(page.locator('.source-title')).toHaveText('ADMET profiling.');
   await expect(page.locator('.admet-top-bar .brand img')).toHaveAttribute('src', 'assets/ddu-mark.svg');
   await noOverflow(page, 'standalone ADMET');
   expect(await page.evaluate(() => DduAdmetApp.getProfiles())).toEqual([]);

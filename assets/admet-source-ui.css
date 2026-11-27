@@ -1,74 +1,111 @@
-/* Source-only ADMET / Research Edition. The source schema and actions are unchanged. */
+/* Compact, auto-first ADMET / Research Edition. Shared by both entry points. */
 .admet-source-app{color:var(--text);font-size:13px;line-height:1.75;min-width:0}
-.admet-source-app .source-title{font:400 46px/1.1 var(--font-display);letter-spacing:-.035em;margin:10px 0 16px}
+.admet-source-app .visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.admet-source-app .source-title{font:400 46px/1.1 var(--font-display);letter-spacing:-.035em;margin:10px 0 12px}
 .admet-source-app .source-title em{font-weight:400;color:var(--red)}
 .admet-source-app .source-title:focus{outline:none}
-.admet-source-app .source-step-nav{display:flex;gap:26px;flex-wrap:wrap;padding:15px 0;border-block:1px solid var(--panel-line-solid);margin:22px 0}
-.admet-source-app .source-step-nav a{text-decoration:none;font-size:11px;color:var(--text-dim)}
-.admet-source-app .source-step-nav a:hover{color:var(--accent)}
-.admet-source-app .source-step-nav span{font:9px var(--font-mono);color:var(--accent);margin-right:8px}
-.admet-source-app .source-section-number{font:10px var(--font-mono);color:var(--accent);display:inline-block;margin-right:12px;vertical-align:middle}
-@media(max-width:650px){.admet-source-app .source-title{font-size:38px}.admet-source-app .source-step-nav{gap:14px 20px}.admet-source-app .source-step-nav a{font-size:10px}.admet-source-app .source-step-nav span{font-size:8px;margin-right:5px}}
-.admet-source-app h3{font:400 25px/1.3 var(--font-display);letter-spacing:-.02em;margin:0 0 12px}
+.admet-source-app h2,.admet-source-app h3{font:400 25px/1.3 var(--font-display);letter-spacing:-.02em;margin:0}
 .admet-source-app .source-kicker{font:9px/1.6 var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
 .admet-source-app .source-muted{color:var(--text-dim);font-size:11px;line-height:1.85}
-.admet-source-app>p.source-muted{max-width:850px;font-size:12px;margin-bottom:18px}
-.admet-source-app .source-card{padding:25px;border:1px solid var(--panel-line);border-radius:4px;background:var(--bg-surface);margin-bottom:22px;min-width:0}
-.admet-source-app .source-card>.source-kicker{margin-bottom:12px}
-.admet-source-app .source-card>p{margin-bottom:15px}
-.admet-source-app .source-notice{padding:15px 18px;border-left:2px solid #b88a55;background:#eee8d9;margin:20px 0 26px;font-size:11px;line-height:1.9;border-radius:0;color:#5c574a}
-.admet-source-app .source-notice strong{color:var(--ink);font-weight:500}
-.admet-source-app .source-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:18px;min-width:0}
-.admet-source-app .source-grid>.source-card{margin-bottom:22px;background:#edeFE7;border-color:#d6dacf}
-.admet-source-app .source-grid>.source-card:last-child{background:#eeebe2;border-color:#dcd7ca}
-.admet-source-app .source-grid>.source-card h3{font-size:30px}
-.admet-source-app .source-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:16px}
-.admet-source-app label{display:block;font-size:10px;color:var(--text-dim);margin-bottom:7px;margin-top:7px;line-height:1.7}
+.admet-source-app .admet-mode-note{display:flex;flex-wrap:wrap;gap:6px 20px;color:var(--text-dim);font-size:11px;margin:0 0 24px}
+.admet-source-app .admet-mode-note span:first-child{color:var(--pine)}
+.admet-source-app .source-card{padding:24px;border:1px solid var(--panel-line);border-radius:4px;background:var(--bg-surface);margin-bottom:18px;min-width:0;scroll-margin-top:80px}
+.admet-source-app .source-notice{padding:14px 18px;border-left:2px solid #b88a55;background:#eee8d9;margin:16px 0;font-size:11px;line-height:1.9;color:#5c574a}
+.admet-source-app .source-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;min-width:0}
+.admet-source-app .source-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px}
+.admet-source-app label{display:block;font-size:11px;color:var(--text-dim);margin:7px 0;line-height:1.7}
 .admet-source-app input:not([type=checkbox]):not([type=file]),.admet-source-app select,.admet-source-app textarea{width:100%;background:#fffefa;border:1px solid var(--panel-line-solid);border-radius:3px;padding:10px 12px;color:var(--ink);font-size:12px;min-width:0}
-.admet-source-app textarea{font:11px/1.85 var(--font-mono);min-height:120px;resize:vertical}
+.admet-source-app textarea{font:12px/1.85 var(--font-mono);min-height:112px;resize:vertical;display:block}
 .admet-source-app textarea::placeholder{font-size:11px}
 .admet-source-app input[type=checkbox]{width:auto;vertical-align:middle;margin-right:7px;accent-color:var(--red)}
-.admet-source-app input[type=file]{font-size:11px}
-.admet-source-app button{padding:8px 12px;border-radius:3px;border:1px solid var(--panel-line-solid);background:transparent;color:var(--ink);font-size:10px;font-weight:500;line-height:1.6}
-.admet-source-app button.source-primary{background:var(--ink);color:var(--paper);border-color:var(--ink);font-weight:500}
+.admet-source-app input[type=file]{font-size:11px;max-width:100%}
+.admet-source-app button{padding:8px 12px;min-height:34px;border-radius:3px;border:1px solid var(--panel-line-solid);background:transparent;color:var(--ink);font-size:11px;font-weight:500;line-height:1.6}
+.admet-source-app button.source-primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .admet-source-app button.source-primary:hover:not(:disabled){background:var(--red);border-color:var(--red)}
 .admet-source-app button:hover:not(:disabled){border-color:var(--ink)}
 .admet-source-app button:disabled{opacity:.45;cursor:not-allowed}
 .admet-source-app a{color:var(--accent);font-size:11px;text-underline-offset:3px}
-.admet-source-app table{width:100%;min-width:640px;border-collapse:collapse;font-size:11px;text-align:left}
+.admet-source-app .admet-input-heading,.admet-source-app .admet-results-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.admet-source-app #admetInputCount{font:10px var(--font-mono);font-variant-numeric:tabular-nums}
+.admet-source-app #admetInputCount[data-error=true]{color:var(--error)}
+.admet-source-app .admet-input-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:16px 0 10px}
+.admet-source-app .admet-input-toolbar select{width:auto;max-width:100%;padding:8px 10px}
+.admet-source-app .admet-input-toolbar button{margin-left:auto}
+.admet-source-app .admet-input-options{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-top:8px}
+.admet-source-app .admet-input-options>details{flex:1;min-width:0}
+.admet-source-app .admet-input-options .source-actions{align-items:flex-start;gap:4px;margin:4px 0 10px;flex-direction:column}
+.admet-source-app #admetIdentityLabel{max-width:300px}
+.admet-source-app #admetAddIdentity{border-color:transparent;color:var(--text-dim);font-size:10px;padding-inline:0;white-space:nowrap}
+.admet-source-app #admetAddIdentity:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+.admet-source-app .source-checkbox{margin:14px 0;line-height:1.9;color:var(--text-dim)}
+.admet-source-app .admet-run-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px}
+.admet-source-app #admetAutoRun{min-height:44px;padding:10px 22px;font-size:13px;min-width:175px}
+.admet-source-app #admetApiStatus{flex:1;min-width:180px;font-size:10px}
+.admet-source-app .admet-queue-progress{margin-top:18px}
+.admet-source-app progress{appearance:none;display:block;width:100%;height:4px;border:0;border-radius:2px;overflow:hidden;background:var(--panel-line-solid);accent-color:var(--pine);margin-top:6px}
+.admet-source-app progress::-webkit-progress-bar{background:var(--panel-line-solid)}
+.admet-source-app progress::-webkit-progress-value{background:var(--pine)}
+.admet-source-app progress::-moz-progress-bar{background:var(--pine)}
+.admet-source-app #admetSourceMessage{position:sticky;top:68px;z-index:3;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg-raised);padding:12px 16px;border:1px solid #a8b8a8;border-left:3px solid var(--success);border-radius:3px;margin:0 0 18px;font-size:12px;box-shadow:var(--shadow-sm);max-height:180px;overflow:auto}
+.admet-source-app #admetSourceMessage[data-error=true]{border-color:#d1a89b;border-left-color:var(--error)}
+.admet-source-app .admet-exports{margin:0;gap:6px}
+.admet-source-app .admet-exports button{font-size:10px}
+.admet-source-app .admet-results-toolbar{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px 16px}
+.admet-source-app #admetSourceFilter{max-width:290px;font-size:11px}
+.admet-source-app .admet-queue-options[open]{flex-basis:100%}
+.admet-source-app .admet-queue-options .source-actions{margin:6px 0}
+.admet-source-app .source-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin:16px 0;border-block:1px solid var(--panel-line)}
+.admet-source-app .source-metric{padding:12px 16px;border-right:1px solid var(--panel-line);min-width:0}
+.admet-source-app .source-metric:first-child{padding-left:0}
+.admet-source-app .source-metric:last-child{border-right:0}
+.admet-source-app .source-metric strong{display:inline-block;color:var(--ink);font:400 26px var(--font-display);font-variant-numeric:tabular-nums;margin-right:9px}
+.admet-source-app .source-metric span{display:inline-block;font-size:10px;color:var(--text-dim)}
+.admet-source-app table{width:100%;min-width:600px;border-collapse:collapse;font-size:11px;text-align:left}
 .admet-source-app td,.admet-source-app th{padding:12px;border-bottom:1px solid var(--panel-line);vertical-align:top}
 .admet-source-app th{font:9px/1.8 var(--font-mono);color:var(--text-dim);background:#eae7dc;text-transform:uppercase;letter-spacing:.03em}
-.admet-source-app .source-table-wrap{overflow:auto;max-height:520px;margin-top:16px;border:1px solid var(--panel-line);border-radius:2px}
-.admet-source-app .source-table-wrap td{overflow-wrap:anywhere}
+.admet-source-app .source-table-wrap{overflow:auto;max-height:520px;margin-top:14px;border:1px solid var(--panel-line);border-radius:2px}
+.admet-source-app .source-table-wrap td{overflow-wrap:anywhere;max-width:360px}
 .admet-source-app .source-table-wrap .source-muted{font-size:10px}
 .admet-source-app tr.source-selected{background:#e8ede3}
 .admet-source-app tr.source-selected>td:first-child{box-shadow:inset 2px 0 var(--pine)}
-.admet-source-app #admetSourceRows button{display:block;white-space:nowrap;margin-bottom:5px;font-size:9px;padding:5px 9px}
-.admet-source-app .source-pill{display:inline-block;font:9px var(--font-mono);padding:3px 7px;border-radius:2px;border:1px solid var(--panel-line-solid);white-space:nowrap}
-.admet-source-app #admetSourceMessage{position:sticky;top:8px;z-index:3;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg-raised);padding:14px 18px;border:1px solid #a8b8a8;border-left:3px solid var(--success);border-radius:3px;margin:14px 0;font-size:12px;box-shadow:var(--shadow-sm)}
-.admet-source-app #admetSourceMessage[data-error=true]{border-color:#d1a89b;border-left-color:var(--error)}
-.admet-source-app pre{white-space:pre-wrap;overflow-wrap:anywhere;font:10px/1.8 var(--font-mono);background:#efede4;padding:14px;border-radius:2px;max-height:300px;overflow:auto;margin-top:10px;color:var(--text-dim)}
-.admet-source-app summary{cursor:pointer;color:var(--text-dim);font-size:10px}
-.admet-source-app details h4{font:400 19px var(--font-display);margin:20px 0 7px}
-.admet-source-app .source-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin:20px 0;border-block:1px solid var(--panel-line)}
-.admet-source-app .source-metric{padding:18px 15px;border-right:1px solid var(--panel-line);min-width:0}
-.admet-source-app .source-metric:first-child{padding-left:0}
-.admet-source-app .source-metric:last-child{border-right:0}
-.admet-source-app .source-metric strong{display:block;color:var(--ink);font:400 33px var(--font-display);font-variant-numeric:tabular-nums}
-.admet-source-app .source-metric span{font:8px/1.7 var(--font-mono);color:var(--text-dim);text-transform:uppercase;letter-spacing:.02em}
-.admet-source-app .source-identity{font:11px/1.9 var(--font-mono);overflow-wrap:anywhere;margin-bottom:18px;color:var(--text-dim);padding-left:15px;border-left:2px solid var(--pine)}
+.admet-source-app #admetSourceRows button{display:block;white-space:nowrap;margin-bottom:5px;font-size:10px;padding:5px 10px;min-height:30px}
+.admet-source-app .admet-result-note{color:var(--text-dim);font-size:10px;margin:12px 0 0}
+.admet-source-app summary{cursor:pointer;color:var(--text-dim);font-size:11px;min-height:34px;padding:6px 0}
+.admet-source-app .source-disclosure{padding:14px 24px;margin-bottom:12px}
+.admet-source-app .source-disclosure>summary{color:var(--ink);font-size:12px;font-weight:500;padding:6px 0}
+.admet-source-app .source-disclosure-body{padding:16px 0 8px;min-width:0}
+.admet-source-app .source-disclosure-body p{margin:0 0 12px;overflow-wrap:anywhere}
+.admet-source-app .admet-swiss-tools{border-bottom:1px solid var(--panel-line);padding:0 0 18px;margin-bottom:18px}
+.admet-source-app #admetSwissDownloads:empty{display:none}
+.admet-source-app .admet-import-options{margin-top:12px}
+.admet-source-app .admet-help{background:transparent;border:0;margin-bottom:0}
+.admet-source-app .admet-help .source-disclosure-body{max-width:800px;color:var(--text-dim);font-size:11px;line-height:1.9}
+.admet-source-app .source-identity{font:11px/1.9 var(--font-mono);overflow-wrap:anywhere;margin-bottom:16px;color:var(--text-dim);padding-left:15px;border-left:2px solid var(--pine)}
 .admet-source-app .source-identity strong{font:400 25px var(--font-display);color:var(--ink);display:inline-block;margin-bottom:8px}
-.admet-source-app .source-checkbox{margin:14px 0;line-height:1.9;color:var(--text-dim)}
+.admet-source-app .admet-evidence-disclosure{margin-top:14px}
+.admet-source-app .admet-evidence-disclosure h3{font-size:20px;margin:18px 0 8px}
+.admet-source-app pre{white-space:pre-wrap;overflow-wrap:anywhere;font:10px/1.8 var(--font-mono);background:#efede4;padding:14px;border-radius:2px;max-height:300px;overflow:auto;margin-top:10px;color:var(--text-dim)}
 .admet-source-app .source-delete{color:var(--error)}
-.admet-source-app #admetSourceFilter{font-size:11px}
 .admet-source-app #historyList{font-size:11px;margin-top:15px}
 .admet-source-app #historyMsg{font-size:11px;margin-top:12px;color:var(--accent)}
-@media(max-width:650px){.admet-source-app h2{font-size:38px}.admet-source-app h3{font-size:23px}.admet-source-app .source-card{padding:20px}.admet-source-app .source-grid{grid-template-columns:1fr;gap:12px}.admet-source-app .source-notice{padding:14px 16px;font-size:11px}.admet-source-app .source-grid>.source-card{margin-bottom:10px}.admet-source-app .source-grid{margin-bottom:12px}.admet-source-app .source-metrics{grid-template-columns:repeat(2,1fr)}.admet-source-app .source-metric{border-bottom:1px solid var(--panel-line);padding:14px 12px}.admet-source-app .source-metric:nth-child(2n){border-right:0}.admet-source-app .source-metric:nth-child(n+3){border-bottom:0}.admet-source-app .source-metric:nth-child(3){padding-left:0}.admet-source-app .source-actions{gap:7px}.admet-source-app .source-actions button{font-size:10px}.admet-source-app .source-identity{font-size:10px}.admet-source-app input:not([type=checkbox]):not([type=file]),.admet-source-app select{font-size:12px}.admet-source-app textarea{font-size:11px}.admet-source-app .source-muted{font-size:11px}}
-
 @media(max-width:650px){
+  .admet-source-app .source-title{font-size:38px}
+  .admet-source-app h2{font-size:24px}
+  .admet-source-app .source-card{padding:18px}
+  .admet-source-app .source-disclosure{padding:12px 18px}
+  .admet-source-app .source-grid{grid-template-columns:1fr;gap:12px}
   .admet-source-app .source-card input:not([type=checkbox]):not([type=file]),.admet-source-app .source-card select,.admet-source-app .source-card textarea{font-size:16px}
   .admet-source-app .source-card textarea::placeholder{font-size:12px}
-  .admet-source-app label{font-size:11px}
-  .admet-source-app .source-actions button{min-height:42px;font-size:11px}
-  .admet-source-app #admetSourceRows button{min-height:36px;font-size:10px}
+  .admet-source-app .admet-input-toolbar{gap:8px}
+  .admet-source-app .admet-input-toolbar button{margin-left:0}
+  .admet-source-app button,.admet-source-app summary{min-height:42px}
+  .admet-source-app #admetAddIdentity{font-size:10px}
+  .admet-source-app #admetApiStatus{flex-basis:100%}
+  .admet-source-app .admet-exports{margin-top:2px}
+  .admet-source-app .source-metric{padding:12px 8px}
+  .admet-source-app .source-metric strong{display:block;font-size:25px}
+  .admet-source-app .source-metric span{font-size:9px;line-height:1.5}
+  .admet-source-app #admetSourceRows button{min-height:36px}
+  .admet-source-app #admetSourceMessage{top:64px;font-size:11px}
+  .admet-source-app .source-identity{font-size:10px}
 }
