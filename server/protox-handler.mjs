@@ -3,7 +3,7 @@
 const ORIGIN = 'https://tox.charite.de';
 const ROOT = `${ORIGIN}/protox3/`;
 const AUTH_URL = 'https://lfizlfdlrrmtkgzdmncc.supabase.co/auth/v1/user';
-const ADAPTER_VERSION = '2026-11-27.1';
+const ADAPTER_VERSION = '2026-11-27.2';
 // Public anon key already used by the website. This is NOT a service-role credential.
 const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmaXpsZmRscnJtdGtnemRtbmNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyNDA3NTYsImV4cCI6MjA5NzgxNjc1Nn0.2oD5KlqRGber12j117F-VmJSHT66z-souEj5Q5CF_Ik';
 export const MODELS = 'acute_tox dili neuro nephro respi cardio carcino immuno mutagen cyto bbb eco clinical nutri nr_ahr nr_ar nr_ar_lbd nr_aromatase nr_er nr_er_lbd nr_ppar_gamma sr_are sr_hse sr_mmp sr_p53 sr_atad5 mie_thr_alpha mie_thr_beta mie_ttr mie_ryr mie_gabar mie_nmdar mie_ampar mie_kar mie_ache mie_car mie_pxr mie_nadhox mie_vgsc mie_nis CYP1A2 CYP2C19 CYP2C9 CYP2D6 CYP3A4 CYP2E1 tox_targets';
@@ -32,10 +32,35 @@ async function readBounded(response, limit) {
   }
   return text + decoder.decode();
 }
+// The reference API client uses the retrieve body only as a readiness signal.
+// Do not interpret or save it as prediction evidence, and do not download an
+// entire HTML result panel just to establish that a non-empty response exists.
+async function hasReadinessContent(response, limit = 16000) {
+  const reader = response.body?.getReader();
+  if (!reader) return false;
+  const decoder = new TextDecoder();
+  let remaining = limit;
+  try {
+    while (remaining > 0) {
+      const { done, value } = await reader.read();
+      if (done) return false;
+      const text = decoder.decode(value.subarray(0, remaining), { stream: true });
+      remaining -= value.byteLength;
+      if (text.trim()) return true;
+    }
+    throw fail(502, 'The result-check response has excessive empty content. No source values were added.');
+  } finally { await reader.cancel().catch(() => {}); }
+}
+function providerFailure(stage, upstreamStatus, error) {
+  const label = { enqueue: 'submission', retrieve: 'result check', file: 'result file' }[stage];
+  const detail = error.status ? error.message : 'The provider request could not be completed. A submitted job may still be running; do not automatically resubmit.';
+  return Object.assign(fail(error.status || 502, `ProTox ${label}${upstreamStatus === null ? '' : ` (HTTP ${upstreamStatus})`}: ${detail}`, error.retryAfter), { providerStage: stage, upstreamStatus });
+}
 export function createHandler({ fetch: fetchImpl = globalThis.fetch.bind(globalThis), timeoutMs = 45000 } = {}) {
-  async function upstream(path, data, limit = 512000) {
+  async function upstream(path, data, { stage = 'file', limit = 512000 } = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let upstreamStatus = null;
     try {
       const response = await fetchImpl(ROOT + path, {
         // Workers supports "manual", not "error". Reject 3xx explicitly below;
@@ -44,17 +69,29 @@ export function createHandler({ fetch: fetchImpl = globalThis.fetch.bind(globalT
         headers: data ? { 'Content-Type': 'application/x-www-form-urlencoded' } : { Accept: 'text/plain,text/csv' },
         ...(data ? { body: new URLSearchParams(data).toString() } : {})
       });
+      upstreamStatus = response.status;
       const retryAfter = retrySeconds(response.headers.get('Retry-After'));
-      if (response.status >= 300 && response.status < 400) throw fail(502, 'ProTox returned a redirect, which was blocked. A submitted job may still exist; do not automatically resubmit.');
-      if (response.status === 429) throw fail(429, 'ProTox is rate-limiting requests. Wait before resuming; no submission is automatically retried.', retryAfter);
-      if (response.status === 403) throw fail(403, 'ProTox denied access or its shared source-IP daily quota was reached (250 queries/day). Try later or use a provider export.');
-      if (!response.ok && response.status !== 404) throw fail(502, `ProTox returned HTTP ${response.status}. No predictions were substituted.`);
+      if (response.status >= 300 && response.status < 400) throw fail(502, 'The provider returned a redirect, which was blocked. A submitted job may still exist; do not automatically resubmit.');
+      if (response.status === 429) throw fail(429, 'The provider is rate-limiting requests. Wait before resuming; no submission is automatically retried.', retryAfter);
+      if (response.status === 403) throw fail(403, 'Access was denied or the shared source-IP daily quota was reached (250 queries/day). Try later or use a provider export.');
+      if (response.status === 404) {
+        if (stage === 'enqueue') throw fail(502, 'The submission endpoint was not found. No job ID was received. Use the provider website and import its export.');
+        // Documented 404 = pending / file not yet present, even if the web server
+        // supplies an HTML error body. Never parse that body into source values.
+        await response.body?.cancel().catch(() => {});
+        return { status: 404, text: '', hasContent: false, retryAfter };
+      }
+      if (!response.ok) throw fail(502, 'The provider request failed. No predictions were substituted.');
+      if (stage === 'retrieve') return { status: response.status, hasContent: await hasReadinessContent(response), retryAfter };
       const text = await readBounded(response, limit);
-      if (/^\s*<(?:!doctype|html|body)/i.test(text)) throw fail(502, 'ProTox returned a web/error page instead of API output. Use a provider export.');
+      // PHP can label plain IDs or CSV as text/html, so inspect actual content,
+      // not the media type alone. Only a bare job ID or actual CSV is accepted.
+      if (/^\s*<(?:!doctype|html|head|body)/i.test(text)) throw fail(502, stage === 'enqueue'
+        ? 'The provider returned a web/error page instead of a job ID. No job ID was received; do not repeatedly resubmit. Use the provider website and import its export.'
+        : 'The provider returned a web/error page instead of CSV. No source values were added; retry retrieval later or import a provider export.');
       return { status: response.status, text, retryAfter };
     } catch (error) {
-      if (error.status) throw error;
-      throw fail(502, 'Could not reach the ProTox API. A submitted job may still be running; do not automatically resubmit.');
+      throw providerFailure(stage, upstreamStatus, error);
     } finally { clearTimeout(timer); }
   }
   async function verifySession(authorization) {
@@ -101,28 +138,29 @@ export function createHandler({ fetch: fetchImpl = globalThis.fetch.bind(globalT
       await verifySession(authorization);
       if (action === 'enqueue') {
         // Intentionally no retry: a lost POST response may have already created a job.
-        const response = await upstream('src/api_enqueue.php', { input_type: 'smiles', input: input.smiles, requested_data: JSON.stringify([MODELS]) }, 2000);
+        const response = await upstream('src/api_enqueue.php', { input_type: 'smiles', input: input.smiles, requested_data: JSON.stringify([MODELS]) }, { stage: 'enqueue', limit: 2000 });
         const jobId = response.text.trim();
-        if (response.status !== 200 || !ID.test(jobId)) throw fail(502, 'ProTox did not return a recognizable job ID. No local prediction was created.');
+        if (response.status !== 200 || !ID.test(jobId)) throw providerFailure('enqueue', response.status, fail(502, 'The provider did not return a recognizable job ID. No local prediction was created.'));
         return json({ jobId, retryAfter: Math.max(5, response.retryAfter), requestedModels: MODELS });
       }
       const jobId = input.jobId;
-      const response = await upstream('src/api_retrieve.php', { id: jobId }, 16000);
-      if (response.status === 404 || !response.text.trim()) return json({ state: 'pending', jobId, retryAfter: Math.max(30, response.retryAfter) });
+      const response = await upstream('src/api_retrieve.php', { id: jobId }, { stage: 'retrieve' });
+      if (response.status === 404 || !response.hasContent) return json({ state: 'pending', jobId, retryAfter: Math.max(30, response.retryAfter) });
       const files = [], missing = [];
       // Keep raw provider files separate, including their original headers and units.
       for (const [suffix, type] of [['tox_class', 'acute toxicity'], ['result', 'toxicity model'], ['tox_targets', 'toxicity target']]) {
         const path = `csv/${jobId}_${suffix}.csv`;
         const file = await upstream(path);
         if (file.status === 404 || !file.text.trim()) { missing.push(type); continue; }
-        if (!/\bTarget\b/i.test(file.text.split(/\r?\n/, 1)[0]) || !/\bPrediction\b/i.test(file.text.split(/\r?\n/, 1)[0])) throw fail(502, 'ProTox output format changed. Raw exports can be imported for review; nothing was estimated.');
+        if (!/\bTarget\b/i.test(file.text.split(/\r?\n/, 1)[0]) || !/\bPrediction\b/i.test(file.text.split(/\r?\n/, 1)[0])) throw providerFailure('file', file.status, fail(502, 'Output format changed. Raw exports can be imported for review; nothing was estimated.'));
         if (file.text.trim().split(/\r?\n/).length < 2) { missing.push(type); continue; }
         files.push({ type, text: file.text, url: ROOT + path });
       }
       if (!files.length) return json({ state: 'pending', jobId, retryAfter: 30 });
       return json({ state: 'ready', jobId, files, missing, retryAfter: 30 });
     } catch (error) {
-      return json({ error: error.status ? error.message : 'ProTox integration failed. No source values were added.', ...(error.retryAfter ? { retryAfter: error.retryAfter } : {}) }, error.status || 502);
+      return json({ error: error.status ? error.message : 'ProTox integration failed. No source values were added.', ...(error.retryAfter ? { retryAfter: error.retryAfter } : {}),
+        ...(error.providerStage ? { diagnostics: { adapterVersion: ADAPTER_VERSION, stage: error.providerStage, upstreamStatus: error.upstreamStatus } } : {}) }, error.status || 502);
     }
   };
 }
